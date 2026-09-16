@@ -4,9 +4,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security.password import hash_password, verify_password
+from app.core.security.jwt import create_access_token
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin
+
 
 router = APIRouter()
 
@@ -76,16 +78,12 @@ async def login_user(
             detail="User account is inactive",
         )
 
+    access_token = create_access_token(str(db_user.id))
+
     return {
         "message": "Login successful",
         "id": db_user.id,
         "email": db_user.email,
         "full_name": db_user.full_name,
-    }
-    
-    return {
-        "message": "Login successful",
-        "id": db_user.id,
-        "email": db_user.email,
-        "full_name": db_user.full_name,
+        "access_token": access_token,
     }
