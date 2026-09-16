@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.api.dependencies import get_current_user_id
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -87,3 +88,14 @@ async def login_user(
         "full_name": db_user.full_name,
         "access_token": access_token,
     }
+
+@router.get("/auth/me")
+async def get_current_user(
+    user_id: int = Depends(get_current_user_id),
+):
+    return {
+        "user_id": user_id,
+    }
+
+
+
