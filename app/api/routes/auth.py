@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.security.password import hash_password
+from app.core.security.password import hash_password, verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate
-
+from app.schemas.user import UserCreate, UserLogin
 
 router = APIRouter()
 
@@ -42,4 +42,50 @@ async def register_user(
         "id": new_user.id,
         "email": new_user.email,
         "full_name": new_user.full_name,
+    }
+
+@router.post("/auth/login")
+async def login_user(
+    user: UserLogin,
+    db: Session = Depends(get_db),
+):
+    db_user = db.scalar(
+        select(User).where(User.email == user.email)
+    )
+
+    if db_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    password_valid = verify_password(
+        user.password,
+        db_user.password_hash,
+    )
+
+    if not password_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    if not db_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
+    return {
+        "message": "Login successful",
+        "id": db_user.id,
+        "email": db_user.email,
+        "full_name": db_user.full_name,
+    }
+    
+    return {
+        "message": "Login successful",
+        "id": db_user.id,
+        "email": db_user.email,
+        "full_name": db_user.full_name,
     }
