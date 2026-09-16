@@ -1,0 +1,43 @@
+from logging.config import fileConfig
+
+from alembic import context
+
+from app.core.config import settings
+from app.db.database import engine
+from app.models import Base, User
+
+
+config = context.config
+
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+
+target_metadata = Base.metadata
+
+database_url = settings.database_url
+
+
+def run_migrations_offline() -> None:
+    """Run migrations in offline mode."""
+    context.configure(
+        url=database_url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online() -> None:
+    """Run migrations in online mode."""
+    with engine.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=Base.metadata,
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()

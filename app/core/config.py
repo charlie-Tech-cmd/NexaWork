@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL
 
 
 class Settings(BaseSettings):
@@ -10,6 +11,17 @@ class Settings(BaseSettings):
     db_name: str = "nexawork"
     db_user: str = "postgres"
     db_password: str = "postgres"
+
+    @property
+    def database_url(self) -> URL:
+        return URL.create(
+            "postgresql+psycopg",
+            username=self.db_user,
+            password=self.db_password,
+            host=self.db_host,
+            port=self.db_port,
+            database=self.db_name,
+        )
 
     model_config = SettingsConfigDict(
         env_file=".env",
