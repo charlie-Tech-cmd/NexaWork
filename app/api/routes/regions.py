@@ -70,3 +70,22 @@ async def get_region(
         )
 
     return region
+
+@router.get(
+    "/organizations/{organization_id}",
+    response_model=list[RegionResponse],
+)
+async def list_regions(
+    organization_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    regions = db.scalars(
+        select(Region)
+        .where(
+            Region.organization_id == organization_id
+        )
+        .order_by(Region.id)
+    ).all()
+
+    return regions
