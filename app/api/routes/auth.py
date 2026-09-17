@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.api.dependencies import get_current_user_id
+from app.api.dependencies import get_current_user
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -89,9 +89,7 @@ async def login_user(
     }
 
 @router.get("/auth/me", response_model=UserResponse)
-async def get_current_user(
-    current_user: User = Depends(get_current_user_id),
+async def get_current_user_profile(
+    current_user: User = Depends(get_current_user),
 ):
     return current_user
-
-
