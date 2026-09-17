@@ -8,8 +8,7 @@ from app.core.security.password import hash_password, verify_password
 from app.core.security.jwt import create_access_token
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin
-
+from app.schemas.user import UserCreate, UserLogin, UserResponse
 
 router = APIRouter()
 
@@ -89,13 +88,10 @@ async def login_user(
         "access_token": access_token,
     }
 
-@router.get("/auth/me")
+@router.get("/auth/me", response_model=UserResponse)
 async def get_current_user(
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(get_current_user_id),
 ):
-    return {
-        "user_id": user_id,
-    }
-
+    return current_user
 
 

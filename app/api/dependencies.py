@@ -14,7 +14,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 def get_current_user_id(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
-) -> int:
+) -> User:
     try:
         payload = decode_access_token(token)
         user_id = int(payload["sub"])
@@ -34,4 +34,4 @@ def get_current_user_id(
             detail="User not found",
         )
 
-    return user_id
+    return db_user
