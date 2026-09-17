@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
@@ -46,3 +47,26 @@ async def create_region(
     db.refresh(new_region)
 
     return new_region
+
+@router.get(
+    "/{region_id}",
+    response_model=RegionResponse,
+)
+async def get_region(
+    region_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    region = db.scalar(
+        select(Region).where(
+            Region.id == region_id
+        )
+    )
+
+    if region is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Region not found",
+        )
+
+    return region
