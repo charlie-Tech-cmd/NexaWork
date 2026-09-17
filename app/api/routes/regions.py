@@ -7,8 +7,11 @@ from app.api.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.region import Region
 from app.models.user import User
-from app.schemas.region import RegionCreate, RegionResponse
-
+from app.schemas.region import (
+    RegionCreate,
+    RegionResponse,
+    RegionUpdate,
+)
 
 router = APIRouter(
     prefix="/regions",
@@ -89,3 +92,47 @@ async def list_regions(
     ).all()
 
     return regions
+
+@router.put(
+    "/{region_id}",
+    response_model=RegionResponse,
+)
+async def update_region(
+    region_id: int,
+    region_data: RegionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    region = db.scalar(
+        select(Region).where(
+            Region.id == region_id
+        )
+    )
+
+    if region is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Region not found",
+        )
+
+    if region_data.name is not None:
+        region.name = region_data.name
+
+    if region_data.slug is not None:
+        region.slug = region_data.slug
+
+    if region_data.is_active is not None:
+        region.is_active = region_data.is_active
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Region slug already exists for this organization",
+        )
+
+    db.refresh(region)
+
+    return region    

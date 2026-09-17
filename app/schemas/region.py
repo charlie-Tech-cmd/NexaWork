@@ -7,6 +7,19 @@ class RegionCreate(BaseModel):
     name: str = Field(min_length=2, max_length=255)
     slug: str = Field(min_length=2, max_length=100)
 
+class RegionUpdate(BaseModel):
+    name: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=255,
+    )
+    slug: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=100,
+    )
+    is_active: bool | None = None   
+
 
 class RegionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
