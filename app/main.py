@@ -8,6 +8,7 @@ from app.api.routes.departments import router as departments_router
 from app.api.routes.employees import router as employees_router
 from app.core.config import settings
 from app.api.routes.roles import router as roles_router
+from app.api.routes.permissions import router as permissions_router
 
 
 app = FastAPI(title=f"{settings.app_name} API")
@@ -19,5 +20,6 @@ app.include_router(regions_router)
 app.include_router(departments_router)
 app.include_router(employees_router)
 app.include_router(roles_router)
+app.include_router(permissions_router)
 
 
