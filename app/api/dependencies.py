@@ -6,6 +6,10 @@ from sqlalchemy import select
 from app.core.security.jwt import decode_access_token
 from app.db.session import get_db
 from app.models.user import User
+from app.models.permission import Permission
+from app.models.role import Role
+from app.models.role_permission import role_permissions
+from app.models.user_role import user_roles
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -35,3 +39,41 @@ def get_current_user(
         )
 
     return db_user
+
+
+def require_permission(permission_name: str):
+    def permission_dependency(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> User:
+        permission_exists = db.scalar(
+            select(Permission.id)
+            .join(
+                role_permissions,
+                role_permissions.c.permission_id == Permission.id,
+            )
+            .join(
+                user_roles,
+                user_roles.c.role_id == role_permissions.c.role_id,
+            )
+            .join(
+                Role,
+                Role.id == user_roles.c.role_id,
+            )
+            .where(
+                user_roles.c.user_id == current_user.id,
+                Permission.name == permission_name,
+                Permission.is_active.is_(True),
+                Role.is_active.is_(True),
+            )
+        )
+
+        if permission_exists is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied",
+            )
+
+        return current_user
+
+    return permission_dependency

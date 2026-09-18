@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_permission
 from app.db.session import get_db
 from app.models.permission import Permission
 from app.models.user import User
@@ -27,8 +27,8 @@ router = APIRouter(
 )
 async def create_permission(
     permission: PermissionCreate,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("USER_VIEW")),
 ):
     new_permission = Permission(
         name=permission.name,
@@ -56,7 +56,7 @@ async def create_permission(
     response_model=list[PermissionResponse],
 )
 async def list_permissions(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("USER_VIEW")),
     db: Session = Depends(get_db),
 ):
     permissions = db.scalars(
@@ -72,7 +72,7 @@ async def list_permissions(
 )
 async def get_permission(
     permission_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("USER_VIEW")),
     db: Session = Depends(get_db),
 ):
     permission = db.get(Permission, permission_id)
