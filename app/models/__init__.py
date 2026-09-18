@@ -5,6 +5,7 @@ from app.models.employee import Employee
 from app.models.organization import Organization
 from app.models.region import Region
 from app.models.user import User
+from app.models.permission import Permission
 
 
 __all__ = [
@@ -13,6 +14,7 @@ __all__ = [
     "Department",
     "Employee",
     "Organization",
+    "Permission",
     "Region",
     "User",
 ]
