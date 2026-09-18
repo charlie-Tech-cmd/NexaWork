@@ -6,6 +6,7 @@ from app.models.organization import Organization
 from app.models.region import Region
 from app.models.user import User
 from app.models.permission import Permission
+from app.models.role import Role
 
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     "Organization",
     "Permission",
     "Region",
+    "Role",
     "User",
 ]
