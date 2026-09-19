@@ -2,11 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security.password import hash_password
 from app.api.dependencies import require_permission
+from app.core.security.password import hash_password, verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import AdminUserCreate, UserResponse, UserUpdate
+from app.schemas.user import (
+    AdminUserCreate,
+    UserDeactivate,
+    UserResponse,
+    UserUpdate,
+)
 
 router = APIRouter(
     prefix="/users",
@@ -91,6 +96,36 @@ async def update_user(
 
     return user
 
+@router.delete(
+    "/{user_id}",
+    response_model=UserResponse,
+)
+async def deactivate_user(
+    user_id: int,
+    user_data: UserDeactivate,
+    current_user: User = Depends(require_permission("USER_DELETE")),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if not verify_password(user_data.password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid password",
+        )
+
+    user.is_active = False
+
+    db.commit()
+    db.refresh(user)
+
+    return user
 
 @router.get(
     "",
