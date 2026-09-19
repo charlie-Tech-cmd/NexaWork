@@ -3,9 +3,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_organization, get_current_user
 from app.db.session import get_db
 from app.models.employee import Employee
+from app.models.branch import Branch
+from app.models.department import Department
+from app.models.organization import Organization
+from app.models.region import Region
 from app.models.user import User
 from app.schemas.employee import (
     EmployeeCreate,
@@ -28,8 +32,50 @@ router = APIRouter(
 async def create_employee(
     employee: EmployeeCreate,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    user = db.scalar(
+        select(User).where(
+            User.id == employee.user_id,
+            User.organization_id == current_organization.id,
+        )
+    )
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    branch = db.scalar(
+        select(Branch)
+        .join(Region, Region.id == Branch.region_id)
+        .where(
+            Branch.id == employee.branch_id,
+            Region.organization_id == current_organization.id,
+        )
+    )
+
+    if branch is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Branch not found",
+        )
+
+    department = db.scalar(
+        select(Department).where(
+            Department.id == employee.department_id,
+            Department.branch_id == branch.id,
+        )
+    )
+
+    if department is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Department not found",
+        )
+
     new_employee = Employee(
         user_id=employee.user_id,
         employee_id=employee.employee_id,
@@ -54,7 +100,6 @@ async def create_employee(
 
     return new_employee
 
-
 @router.get(
     "/{employee_id}",
     response_model=EmployeeResponse,
@@ -62,11 +107,16 @@ async def create_employee(
 async def get_employee(
     employee_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
     employee = db.scalar(
-        select(Employee).where(
-            Employee.id == employee_id
+        select(Employee)
+        .join(Branch, Branch.id == Employee.branch_id)
+        .join(Region, Region.id == Branch.region_id)
+        .where(
+            Employee.id == employee_id,
+            Region.organization_id == current_organization.id,
         )
     )
 
@@ -78,27 +128,6 @@ async def get_employee(
 
     return employee
 
-
-@router.get(
-    "/branches/{branch_id}",
-    response_model=list[EmployeeResponse],
-)
-async def list_branch_employees(
-    branch_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    employees = db.scalars(
-        select(Employee)
-        .where(
-            Employee.branch_id == branch_id
-        )
-        .order_by(Employee.id)
-    ).all()
-
-    return employees
-
-
 @router.get(
     "/departments/{department_id}",
     response_model=list[EmployeeResponse],
@@ -106,8 +135,25 @@ async def list_branch_employees(
 async def list_department_employees(
     department_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    department = db.scalar(
+        select(Department)
+        .join(Branch, Branch.id == Department.branch_id)
+        .join(Region, Region.id == Branch.region_id)
+        .where(
+            Department.id == department_id,
+            Region.organization_id == current_organization.id,
+        )
+    )
+
+    if department is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Department not found",
+        )
+
     employees = db.scalars(
         select(Employee)
         .where(
@@ -118,7 +164,6 @@ async def list_department_employees(
 
     return employees
 
-
 @router.put(
     "/{employee_id}",
     response_model=EmployeeResponse,
@@ -127,11 +172,16 @@ async def update_employee(
     employee_id: int,
     employee_data: EmployeeUpdate,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
     employee = db.scalar(
-        select(Employee).where(
-            Employee.id == employee_id
+        select(Employee)
+        .join(Branch, Branch.id == Employee.branch_id)
+        .join(Region, Region.id == Branch.region_id)
+        .where(
+            Employee.id == employee_id,
+            Region.organization_id == current_organization.id,
         )
     )
 
@@ -141,14 +191,48 @@ async def update_employee(
             detail="Employee not found",
         )
 
-    if employee_data.employee_id is not None:
-        employee.employee_id = employee_data.employee_id
-
     if employee_data.branch_id is not None:
+        branch = db.scalar(
+            select(Branch)
+            .join(Region, Region.id == Branch.region_id)
+            .where(
+                Branch.id == employee_data.branch_id,
+                Region.organization_id == current_organization.id,
+            )
+        )
+
+        if branch is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Branch not found",
+            )
+
         employee.branch_id = employee_data.branch_id
 
     if employee_data.department_id is not None:
+        target_branch_id = (
+            employee_data.branch_id
+            if employee_data.branch_id is not None
+            else employee.branch_id
+        )
+
+        department = db.scalar(
+            select(Department).where(
+                Department.id == employee_data.department_id,
+                Department.branch_id == target_branch_id,
+            )
+        )
+
+        if department is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Department not found",
+            )
+
         employee.department_id = employee_data.department_id
+
+    if employee_data.employee_id is not None:
+        employee.employee_id = employee_data.employee_id
 
     if employee_data.job_title is not None:
         employee.job_title = employee_data.job_title
