@@ -3,9 +3,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_organization, get_current_user
 from app.db.session import get_db
 from app.models.region import Region
+from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.region import (
     RegionCreate,
@@ -28,10 +29,17 @@ async def create_region(
     organization_id: int,
     region: RegionCreate,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    if organization_id != current_organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found",
+        )
+
     new_region = Region(
-        organization_id=organization_id,
+        organization_id=current_organization.id,
         name=region.name,
         slug=region.slug,
     )
@@ -58,11 +66,13 @@ async def create_region(
 async def get_region(
     region_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
     region = db.scalar(
         select(Region).where(
-            Region.id == region_id
+            Region.id == region_id,
+            Region.organization_id == current_organization.id,
         )
     )
 
@@ -81,12 +91,19 @@ async def get_region(
 async def list_regions(
     organization_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    if organization_id != current_organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found",
+        )
+
     regions = db.scalars(
         select(Region)
         .where(
-            Region.organization_id == organization_id
+            Region.organization_id == current_organization.id
         )
         .order_by(Region.id)
     ).all()
@@ -101,11 +118,13 @@ async def update_region(
     region_id: int,
     region_data: RegionUpdate,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
     region = db.scalar(
         select(Region).where(
-            Region.id == region_id
+            Region.id == region_id,
+            Region.organization_id == current_organization.id,
         )
     )
 
