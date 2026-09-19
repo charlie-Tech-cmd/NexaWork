@@ -3,9 +3,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_organization, get_current_user
 from app.db.session import get_db
 from app.models.department import Department
+from app.models.branch import Branch
+from app.models.organization import Organization
+from app.models.region import Region
 from app.models.user import User
 from app.schemas.department import (
     DepartmentCreate,
@@ -29,8 +32,24 @@ async def create_department(
     branch_id: int,
     department: DepartmentCreate,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    branch = db.scalar(
+        select(Branch)
+        .join(Region, Branch.region_id == Region.id)
+        .where(
+            Branch.id == branch_id,
+            Region.organization_id == current_organization.id,
+        )
+    )
+
+    if branch is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Branch not found",
+        )
+
     new_department = Department(
         branch_id=branch_id,
         name=department.name,
@@ -52,7 +71,6 @@ async def create_department(
 
     return new_department
 
-
 @router.get(
     "/{department_id}",
     response_model=DepartmentResponse,
@@ -60,11 +78,16 @@ async def create_department(
 async def get_department(
     department_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
     department = db.scalar(
-        select(Department).where(
-            Department.id == department_id
+        select(Department)
+        .join(Branch, Department.branch_id == Branch.id)
+        .join(Region, Branch.region_id == Region.id)
+        .where(
+            Department.id == department_id,
+            Region.organization_id == current_organization.id,
         )
     )
 
@@ -76,7 +99,6 @@ async def get_department(
 
     return department
 
-
 @router.get(
     "/branches/{branch_id}",
     response_model=list[DepartmentResponse],
@@ -84,18 +106,31 @@ async def get_department(
 async def list_departments(
     branch_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    branch = db.scalar(
+        select(Branch)
+        .join(Region, Branch.region_id == Region.id)
+        .where(
+            Branch.id == branch_id,
+            Region.organization_id == current_organization.id,
+        )
+    )
+
+    if branch is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Branch not found",
+        )
+
     departments = db.scalars(
         select(Department)
-        .where(
-            Department.branch_id == branch_id
-        )
+        .where(Department.branch_id == branch_id)
         .order_by(Department.id)
     ).all()
 
     return departments
-
 
 @router.put(
     "/{department_id}",
@@ -105,11 +140,16 @@ async def update_department(
     department_id: int,
     department_data: DepartmentUpdate,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
     department = db.scalar(
-        select(Department).where(
-            Department.id == department_id
+        select(Department)
+        .join(Branch, Department.branch_id == Branch.id)
+        .join(Region, Branch.region_id == Region.id)
+        .where(
+            Department.id == department_id,
+            Region.organization_id == current_organization.id,
         )
     )
 
