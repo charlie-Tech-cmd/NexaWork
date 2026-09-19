@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_organization, get_current_user
 from app.db.session import get_db
 from app.models.organization import Organization
 from app.models.user import User
@@ -53,12 +53,13 @@ async def create_organization(
 )
 async def get_organization(
     organization_id: int,
-    current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
     organization = db.scalar(
         select(Organization).where(
-            Organization.id == organization_id
+            Organization.id == organization_id,
+            Organization.id == current_organization.id,
         )
     )
 
@@ -69,19 +70,3 @@ async def get_organization(
         )
 
     return organization
-
-
-
-
-
-
-
-
-# curl -X POST http://127.0.0.1:8000/organizations \
-#   -H "Content-Type: application/json" \
-#   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzg5NjUzMjg2fQ.X-QDGgWfIv1PfEux6Bo0p_KW6-Qc9UN6hPhlrFdLZy4" \
-#   -d '{"name":"Nexa Engineering Ltd","slug":"nexa-engineering"}'
-
-
-# curl http://127.0.0.1:8000/organizations/1 \
-#   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzg5NjUzMjg2fQ.X-QDGgWfIv1PfEux6Bo0p_KW6-Qc9UN6hPhlrFdLZy4"

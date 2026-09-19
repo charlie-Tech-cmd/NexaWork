@@ -10,6 +10,7 @@ from app.models.permission import Permission
 from app.models.role import Role
 from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
+from app.models.organization import Organization
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -39,6 +40,26 @@ def get_current_user(
         )
 
     return db_user
+
+
+def get_current_organization(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Organization:
+    organization = db.scalar(
+        select(Organization).where(
+            Organization.id == current_user.organization_id,
+            Organization.is_active.is_(True),
+        )
+    )
+
+    if organization is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization is inactive or unavailable",
+        )
+
+    return organization
 
 
 def require_permission(permission_name: str):
