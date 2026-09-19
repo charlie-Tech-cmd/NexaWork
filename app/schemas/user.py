@@ -6,6 +6,11 @@ class UserCreate(BaseModel):
     password: str
     full_name: str
 
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
