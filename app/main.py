@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.api.routes.roles import router as roles_router
 from app.api.routes.permissions import router as permissions_router
 from app.api.routes.user_roles import router as user_roles_router
+from app.api.routes.users import router as users_router
 
 
 app = FastAPI(title=f"{settings.app_name} API")
@@ -23,5 +24,6 @@ app.include_router(employees_router)
 app.include_router(roles_router)
 app.include_router(permissions_router)
 app.include_router(user_roles_router)
+app.include_router(users_router)
 
 
