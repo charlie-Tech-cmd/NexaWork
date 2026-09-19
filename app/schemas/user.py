@@ -11,6 +11,11 @@ class AdminUserCreate(BaseModel):
     password: str
     full_name: str
 
+class UserUpdate(BaseModel):
+    email: EmailStr | None = None
+    full_name: str | None = None
+    is_active: bool | None = None
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str

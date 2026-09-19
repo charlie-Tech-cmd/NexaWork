@@ -6,8 +6,7 @@ from app.core.security.password import hash_password
 from app.api.dependencies import require_permission
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserResponse
-from app.schemas.user import AdminUserCreate, UserResponse
+from app.schemas.user import AdminUserCreate, UserResponse, UserUpdate
 
 router = APIRouter(
     prefix="/users",
@@ -46,6 +45,51 @@ async def create_user(
     db.refresh(new_user)
 
     return new_user
+
+@router.put(
+    "/{user_id}",
+    response_model=UserResponse,
+)
+async def update_user(
+    user_id: int,
+    user_data: UserUpdate,
+    current_user: User = Depends(require_permission("USER_UPDATE")),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if user_data.email is not None:
+        existing_user = db.scalar(
+            select(User).where(
+                User.email == user_data.email,
+                User.id != user_id,
+            )
+        )
+
+        if existing_user is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered",
+            )
+
+        user.email = user_data.email
+
+    if user_data.full_name is not None:
+        user.full_name = user_data.full_name
+
+    if user_data.is_active is not None:
+        user.is_active = user_data.is_active
+
+    db.commit()
+    db.refresh(user)
+
+    return user
 
 
 @router.get(
