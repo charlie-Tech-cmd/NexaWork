@@ -40,10 +40,12 @@ async def create_user(
         )
 
     new_user = User(
+        organization_id=current_user.organization_id,
         email=user_data.email,
         password_hash=hash_password(user_data.password),
         full_name=user_data.full_name,
     )
+
 
     db.add(new_user)
     db.commit()
@@ -61,7 +63,12 @@ async def update_user(
     current_user: User = Depends(require_permission("USER_UPDATE")),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
+    user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.organization_id == current_user.organization_id,
+        )
+    )
 
     if user is None:
         raise HTTPException(
@@ -106,7 +113,12 @@ async def deactivate_user(
     current_user: User = Depends(require_permission("USER_DELETE")),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
+    user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.organization_id == current_user.organization_id,
+        )
+    )
 
     if user is None:
         raise HTTPException(
@@ -136,7 +148,9 @@ async def list_users(
     db: Session = Depends(get_db),
 ):
     users = db.scalars(
-        select(User).order_by(User.id)
+        select(User)
+        .where(User.organization_id == current_user.organization_id)
+        .order_by(User.id)
     ).all()
 
     return users
@@ -152,7 +166,10 @@ async def get_user(
     db: Session = Depends(get_db),
 ):
     user = db.scalar(
-        select(User).where(User.id == user_id)
+        select(User).where(
+            User.id == user_id,
+            User.organization_id == current_user.organization_id,
+        )
     )
 
     if user is None:
