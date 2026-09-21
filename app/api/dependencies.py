@@ -30,7 +30,10 @@ def get_current_user(
         )
 
     db_user = db.scalar(
-        select(User).where(User.id == user_id)
+        select(User).where(
+            User.id == user_id,
+            User.is_active.is_(True),
+        )
     )
 
     if db_user is None:
