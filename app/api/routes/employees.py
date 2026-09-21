@@ -35,10 +35,12 @@ async def create_employee(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+
     user = db.scalar(
         select(User).where(
             User.id == employee.user_id,
             User.organization_id == current_organization.id,
+            User.is_active.is_(True),
         )
     )
 
