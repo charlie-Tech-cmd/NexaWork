@@ -86,6 +86,7 @@ def require_permission(permission_name: str):
                 Permission.name == permission_name,
                 Permission.is_active.is_(True),
                 Role.is_active.is_(True),
+                Role.organization_id == current_user.organization_id,
             )
         )
 

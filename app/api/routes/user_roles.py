@@ -2,7 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.models.organization import Organization
+from app.api.dependencies import (
+    get_current_organization,
+    get_current_user,
+)
+
 from app.db.session import get_db
 from app.models.role import Role
 from app.models.user import User
@@ -24,9 +29,15 @@ async def assign_role_to_user(
     user_id: int,
     role_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
+    user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.organization_id == current_organization.id,
+        )
+    )
 
     if user is None:
         raise HTTPException(
@@ -34,7 +45,12 @@ async def assign_role_to_user(
             detail="User not found",
         )
 
-    role = db.get(Role, role_id)
+    role = db.scalar(
+        select(Role).where(
+            Role.id == role_id,
+            Role.organization_id == current_organization.id,
+        )
+    )
 
     if role is None:
         raise HTTPException(
@@ -71,9 +87,15 @@ async def assign_role_to_user(
 async def list_user_roles(
     user_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
+    user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.organization_id == current_organization.id,
+        )
+    )
 
     if user is None:
         raise HTTPException(
@@ -87,9 +109,11 @@ async def list_user_roles(
             user_roles,
             user_roles.c.role_id == Role.id,
         )
-        .where(user_roles.c.user_id == user_id)
-        .order_by(Role.id)
-    ).all()
+    .where(
+        user_roles.c.user_id == user_id,
+        Role.organization_id == current_organization.id,
+    )
+        ).all()
 
     return roles
 
@@ -101,9 +125,15 @@ async def remove_role_from_user(
     user_id: int,
     role_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
+    user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.organization_id == current_organization.id,
+        )
+    )
 
     if user is None:
         raise HTTPException(
@@ -111,7 +141,12 @@ async def remove_role_from_user(
             detail="User not found",
         )
 
-    role = db.get(Role, role_id)
+    role = db.scalar(
+        select(Role).where(
+            Role.id == role_id,
+            Role.organization_id == current_organization.id,
+        )
+    )
 
     if role is None:
         raise HTTPException(

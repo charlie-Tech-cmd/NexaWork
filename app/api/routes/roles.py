@@ -3,11 +3,16 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import (
+    get_current_organization,
+    get_current_user,
+)
+
 from app.db.session import get_db
 from app.models.permission import Permission
 from app.models.role import Role
 from app.models.role_permission import role_permissions
+from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.role import RoleCreate, RoleResponse, RoleUpdate
 from app.schemas.permission import PermissionResponse
@@ -26,9 +31,12 @@ router = APIRouter(
 async def create_role(
     role: RoleCreate,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+
     new_role = Role(
+        organization_id=current_organization.id,
         name=role.name,
         description=role.description,
     )
@@ -54,10 +62,13 @@ async def create_role(
 )
 async def list_roles(
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
     roles = db.scalars(
-        select(Role).order_by(Role.id)
+        select(Role)
+        .where(Role.organization_id == current_organization.id)
+        .order_by(Role.id)
     ).all()
 
     return roles
@@ -69,9 +80,15 @@ async def list_roles(
 async def get_role(
     role_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    role = db.get(Role, role_id)
+    role = db.scalar(
+        select(Role).where(
+            Role.id == role_id,
+            Role.organization_id == current_organization.id,
+        )
+    )
 
     if role is None:
         raise HTTPException(
@@ -89,9 +106,15 @@ async def update_role(
     role_id: int,
     role_data: RoleUpdate,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    role = db.get(Role, role_id)
+    role = db.scalar(
+        select(Role).where(
+            Role.id == role_id,
+            Role.organization_id == current_organization.id,
+        )
+    )
 
     if role is None:
         raise HTTPException(
@@ -129,9 +152,15 @@ async def assign_permission_to_role(
     role_id: int,
     permission_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    role = db.get(Role, role_id)
+    role = db.scalar(
+        select(Role).where(
+            Role.id == role_id,
+            Role.organization_id == current_organization.id,
+        )
+    )
 
     if role is None:
         raise HTTPException(
@@ -176,9 +205,15 @@ async def assign_permission_to_role(
 async def list_role_permissions(
     role_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    role = db.get(Role, role_id)
+    role = db.scalar(
+        select(Role).where(
+            Role.id == role_id,
+            Role.organization_id == current_organization.id,
+        )
+    )
 
     if role is None:
         raise HTTPException(
@@ -206,9 +241,16 @@ async def remove_permission_from_role(
     role_id: int,
     permission_id: int,
     current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    role = db.get(Role, role_id)
+
+    role = db.scalar(
+        select(Role).where(
+            Role.id == role_id,
+            Role.organization_id == current_organization.id,
+        )
+    )
 
     if role is None:
         raise HTTPException(
