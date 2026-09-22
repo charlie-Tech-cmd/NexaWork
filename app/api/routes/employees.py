@@ -3,7 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_organization, get_current_user
+from app.api.dependencies import (
+    get_current_employee,
+    get_current_organization,
+    get_current_user,
+)
 from app.db.session import get_db
 from app.models.employee import Employee
 from app.models.branch import Branch
@@ -101,6 +105,15 @@ async def create_employee(
     db.refresh(new_employee)
 
     return new_employee
+
+@router.get(
+    "/me",
+    response_model=EmployeeResponse,
+)
+async def get_my_employee_profile(
+    current_employee: Employee = Depends(get_current_employee),
+):
+    return current_employee
 
 @router.get(
     "/{employee_id}",

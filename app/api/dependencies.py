@@ -11,6 +11,7 @@ from app.models.role import Role
 from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
 from app.models.organization import Organization
+from app.models.employee import Employee
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -43,6 +44,25 @@ def get_current_user(
         )
 
     return db_user
+
+def get_current_employee(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Employee:
+    employee = db.scalar(
+        select(Employee).where(
+            Employee.user_id == current_user.id,
+            Employee.is_active.is_(True),
+        )
+    )
+
+    if employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Employee access required",
+        )
+
+    return employee
 
 
 def get_current_organization(
