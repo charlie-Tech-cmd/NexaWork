@@ -34,6 +34,10 @@ class EmployeeUpdate(BaseModel):
     )
     is_active: bool | None = None
 
+class EmployeeLogin(BaseModel):
+    employee_id: str
+    password: str
+
 
 class EmployeeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

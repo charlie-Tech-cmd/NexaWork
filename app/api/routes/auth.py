@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 from app.core.security.password import hash_password, verify_password
 from app.core.security.jwt import create_access_token
 from app.db.session import get_db
+from app.models.employee import Employee
 from app.models.user import User
+from app.schemas.employee import EmployeeLogin
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 
 router = APIRouter()
@@ -85,6 +87,59 @@ async def login_user(
         "id": db_user.id,
         "email": db_user.email,
         "full_name": db_user.full_name,
+        "access_token": access_token,
+    }
+
+@router.post("/auth/employee/login")
+async def employee_login(
+    employee_login: EmployeeLogin,
+    db: Session = Depends(get_db),
+):
+    employee = db.scalar(
+        select(Employee).where(
+            Employee.employee_id == employee_login.employee_id,
+            Employee.is_active.is_(True),
+        )
+    )
+
+    if employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid employee ID or password",
+        )
+
+    db_user = db.scalar(
+        select(User).where(
+            User.id == employee.user_id,
+            User.is_active.is_(True),
+        )
+    )
+
+    if db_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid employee ID or password",
+        )
+
+    password_valid = verify_password(
+        employee_login.password,
+        db_user.password_hash,
+    )
+
+    if not password_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid employee ID or password",
+        )
+
+    access_token = create_access_token(str(db_user.id))
+
+    return {
+        "message": "Login successful",
+        "id": db_user.id,
+        "email": db_user.email,
+        "full_name": db_user.full_name,
+        "employee_id": employee.employee_id,
         "access_token": access_token,
     }
 
