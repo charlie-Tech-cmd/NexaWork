@@ -39,7 +39,7 @@ def test_decode_access_token_rejects_wrong_secret():
             "sub": "123",
             "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
         },
-        "wrong-secret",
+        "wrong-secret-that-is-long-enough-for-hs256",
         algorithm=settings.jwt_algorithm,
     )
 

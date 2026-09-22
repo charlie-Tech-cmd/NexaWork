@@ -1,3 +1,8 @@
+from datetime import datetime, timedelta, timezone
+
+import jwt
+
+from app.core.config import settings
 from app.core.security.password import hash_password
 from app.models.organization import Organization
 from app.models.user import User
@@ -135,4 +140,76 @@ def test_auth_me_rejects_inactive_user_token(client, db_session):
     assert response.status_code == 401
     assert response.json() == {
         "detail": "User not found",
+    }
+
+
+def test_auth_me_rejects_missing_token(client):
+    response = client.get("/auth/me")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Not authenticated",
+    }
+
+
+def test_auth_me_rejects_expired_token(client):
+    expired_token = jwt.encode(
+        {
+            "sub": "1",
+            "exp": datetime.now(timezone.utc) - timedelta(minutes=1),
+        },
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {expired_token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid or expired token",
+    }
+
+
+def test_auth_me_rejects_token_for_nonexistent_user(client):
+    token = jwt.encode(
+        {
+            "sub": "999999",
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
+        },
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "User not found",
+    }
+
+
+def test_auth_me_rejects_token_with_wrong_secret(client):
+    token = jwt.encode(
+        {
+            "sub": "1",
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
+        },
+        "wrong-secret-that-is-long-enough-for-hs256",
+        algorithm=settings.jwt_algorithm,
+    )
+
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid or expired token",
     }
