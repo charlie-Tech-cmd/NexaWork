@@ -334,3 +334,203 @@ def test_create_employee_rejects_another_organization(
     )
 
     assert created_employee is None
+
+def test_update_employee_rejects_another_organization_branch(
+    client,
+    db_session,
+):
+    organization_a = Organization(
+        name="Organization A",
+        slug="employee-update-branch-a",
+    )
+    organization_b = Organization(
+        name="Organization B",
+        slug="employee-update-branch-b",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    region_a = Region(
+        organization_id=organization_a.id,
+        name="Organization A Region",
+        slug="organization-a-region",
+    )
+    region_b = Region(
+        organization_id=organization_b.id,
+        name="Organization B Region",
+        slug="organization-b-region",
+    )
+    db_session.add_all([region_a, region_b])
+    db_session.flush()
+
+    branch_a = Branch(
+        region_id=region_a.id,
+        name="Organization A Branch",
+        slug="organization-a-branch",
+    )
+    branch_b = Branch(
+        region_id=region_b.id,
+        name="Organization B Branch",
+        slug="organization-b-branch",
+    )
+    db_session.add_all([branch_a, branch_b])
+    db_session.flush()
+
+    department_a = Department(
+        branch_id=branch_a.id,
+        name="Organization A Department",
+        slug="organization-a-department",
+    )
+    db_session.add(department_a)
+    db_session.flush()
+
+    user_a = User(
+        organization_id=organization_a.id,
+        email="employee.update.branch.a@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization A Employee",
+        is_active=True,
+    )
+    db_session.add(user_a)
+    db_session.flush()
+
+    employee_a = Employee(
+        user_id=user_a.id,
+        employee_id="EMP-UPDATE-BRANCH-001",
+        branch_id=branch_a.id,
+        department_id=department_a.id,
+        job_title="Developer",
+    )
+    db_session.add(employee_a)
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "employee.update.branch.a@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/employees/{employee_a.id}",
+        json={
+            "branch_id": branch_b.id,
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Branch not found"}
+
+    db_session.refresh(employee_a)
+
+    assert employee_a.branch_id == branch_a.id
+    assert employee_a.department_id == department_a.id
+
+
+def test_update_employee_rejects_another_organization_department(
+    client,
+    db_session,
+):
+    organization_a = Organization(
+        name="Organization A",
+        slug="employee-update-department-a",
+    )
+    organization_b = Organization(
+        name="Organization B",
+        slug="employee-update-department-b",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    region_a = Region(
+        organization_id=organization_a.id,
+        name="Organization A Region",
+        slug="organization-a-region",
+    )
+    region_b = Region(
+        organization_id=organization_b.id,
+        name="Organization B Region",
+        slug="organization-b-region",
+    )
+    db_session.add_all([region_a, region_b])
+    db_session.flush()
+
+    branch_a = Branch(
+        region_id=region_a.id,
+        name="Organization A Branch",
+        slug="organization-a-branch",
+    )
+    branch_b = Branch(
+        region_id=region_b.id,
+        name="Organization B Branch",
+        slug="organization-b-branch",
+    )
+    db_session.add_all([branch_a, branch_b])
+    db_session.flush()
+
+    department_a = Department(
+        branch_id=branch_a.id,
+        name="Organization A Department",
+        slug="organization-a-department",
+    )
+    department_b = Department(
+        branch_id=branch_b.id,
+        name="Organization B Department",
+        slug="organization-b-department",
+    )
+    db_session.add_all([department_a, department_b])
+    db_session.flush()
+
+    user_a = User(
+        organization_id=organization_a.id,
+        email="employee.update.department.a@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization A Employee",
+        is_active=True,
+    )
+    db_session.add(user_a)
+    db_session.flush()
+
+    employee_a = Employee(
+        user_id=user_a.id,
+        employee_id="EMP-UPDATE-DEPARTMENT-001",
+        branch_id=branch_a.id,
+        department_id=department_a.id,
+        job_title="Developer",
+    )
+    db_session.add(employee_a)
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "employee.update.department.a@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/employees/{employee_a.id}",
+        json={
+            "department_id": department_b.id,
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Department not found"}
+
+    db_session.refresh(employee_a)
+
+    assert employee_a.branch_id == branch_a.id
+    assert employee_a.department_id == department_a.id    
