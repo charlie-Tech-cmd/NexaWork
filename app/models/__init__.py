@@ -9,6 +9,7 @@ from app.models.role import Role
 from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
 from app.models.user import User
+from app.models.team import Team
 
 
 
@@ -22,4 +23,5 @@ __all__ = [
     "Region",
     "Role",
     "User",
+    "Team",
 ]
