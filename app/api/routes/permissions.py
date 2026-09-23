@@ -15,7 +15,7 @@ from app.schemas.permission import (
 
 
 router = APIRouter(
-    prefix="/permissions",
+    prefix="/api/v1/permissions",
     tags=["permissions"],
 )
 
