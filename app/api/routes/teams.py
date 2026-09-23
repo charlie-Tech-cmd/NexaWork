@@ -76,6 +76,40 @@ async def create_team(
     return new_team
 
 @router.get(
+    "/departments/{department_id}",
+    response_model=list[TeamResponse],
+)
+async def list_teams(
+    department_id: int,
+    current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
+    db: Session = Depends(get_db),
+):
+    department = db.scalar(
+        select(Department)
+        .join(Branch, Department.branch_id == Branch.id)
+        .join(Region, Branch.region_id == Region.id)
+        .where(
+            Department.id == department_id,
+            Region.organization_id == current_organization.id,
+        )
+    )
+
+    if department is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Department not found",
+        )
+
+    teams = db.scalars(
+        select(Team)
+        .where(Team.department_id == department_id)
+        .order_by(Team.id)
+    ).all()
+
+    return teams
+
+@router.get(
     "/{team_id}",
     response_model=TeamResponse,
 )

@@ -327,3 +327,169 @@ def test_get_team_rejects_another_organization(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Team not found"}
+
+
+def test_list_teams_allows_current_organization(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Current Organization",
+        slug="team-list-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Current Organization Region",
+        slug="team-list-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        region_id=region.id,
+        name="Current Organization Branch",
+        slug="team-list-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Current Organization Department",
+        slug="team-list-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    team_one = Team(
+        department_id=department.id,
+        name="Engineering Team",
+        slug="engineering-team",
+    )
+    team_two = Team(
+        department_id=department.id,
+        name="Product Team",
+        slug="product-team",
+    )
+    db_session.add_all([team_one, team_two])
+
+    user = User(
+        organization_id=organization.id,
+        email="team.list@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Current Organization User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "team.list@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/teams/departments/{department.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+
+    assert len(response_data) == 2
+    assert [team["id"] for team in response_data] == [
+        team_one.id,
+        team_two.id,
+    ]
+    assert [team["name"] for team in response_data] == [
+        "Engineering Team",
+        "Product Team",
+    ]
+
+
+def test_list_teams_rejects_another_organization(
+    client,
+    db_session,
+):
+    organization_a = Organization(
+        name="Organization A",
+        slug="team-list-a",
+    )
+    organization_b = Organization(
+        name="Organization B",
+        slug="team-list-b",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    region_b = Region(
+        organization_id=organization_b.id,
+        name="Organization B Region",
+        slug="organization-b-region",
+    )
+    db_session.add(region_b)
+    db_session.flush()
+
+    branch_b = Branch(
+        region_id=region_b.id,
+        name="Organization B Branch",
+        slug="organization-b-branch",
+    )
+    db_session.add(branch_b)
+    db_session.flush()
+
+    department_b = Department(
+        branch_id=branch_b.id,
+        name="Organization B Department",
+        slug="organization-b-department",
+    )
+    db_session.add(department_b)
+    db_session.flush()
+
+    team_b = Team(
+        department_id=department_b.id,
+        name="Organization B Team",
+        slug="organization-b-team",
+    )
+    db_session.add(team_b)
+
+    user_a = User(
+        organization_id=organization_a.id,
+        email="team.list.a@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization A User",
+        is_active=True,
+    )
+    db_session.add(user_a)
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "team.list.a@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/teams/departments/{department_b.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Department not found"}
