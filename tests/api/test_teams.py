@@ -1262,3 +1262,112 @@ def test_list_teams_rejects_without_permission(
 
     assert response.status_code == 403
     assert response.json() == {"detail": "Permission denied"}
+
+def test_update_team_can_deactivate_team(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Current Organization",
+        slug="team-deactivate",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Current Organization Region",
+        slug="team-deactivate-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        region_id=region.id,
+        name="Current Organization Branch",
+        slug="team-deactivate-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Current Organization Department",
+        slug="team-deactivate-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    team = Team(
+        department_id=department.id,
+        name="Engineering Team",
+        slug="engineering-team",
+    )
+    db_session.add(team)
+
+    user = User(
+        organization_id=organization.id,
+        email="team.deactivate@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Team Updater",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = Permission(
+        name="TEAM_UPDATE",
+        description="Update teams",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Team Updater",
+        description="Can update teams",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "team.deactivate@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/teams/{team.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["is_active"] is False
+
+    db_session.refresh(team)
+
+    assert team.is_active is False
