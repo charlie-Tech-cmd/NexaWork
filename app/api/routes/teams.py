@@ -11,8 +11,7 @@ from app.models.organization import Organization
 from app.models.region import Region
 from app.models.team import Team
 from app.models.user import User
-from app.schemas.team import TeamCreate, TeamResponse
-
+from app.schemas.team import TeamCreate, TeamResponse, TeamUpdate
 
 router = APIRouter(
     prefix="/teams",
@@ -108,6 +107,56 @@ async def list_teams(
     ).all()
 
     return teams
+
+@router.put(
+    "/{team_id}",
+    response_model=TeamResponse,
+)
+async def update_team(
+    team_id: int,
+    team_data: TeamUpdate,
+    current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
+    db: Session = Depends(get_db),
+):
+    team = db.scalar(
+        select(Team)
+        .join(Department, Team.department_id == Department.id)
+        .join(Branch, Department.branch_id == Branch.id)
+        .join(Region, Branch.region_id == Region.id)
+        .where(
+            Team.id == team_id,
+            Region.organization_id == current_organization.id,
+        )
+    )
+
+    if team is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Team not found",
+        )
+
+    if team_data.name is not None:
+        team.name = team_data.name
+
+    if team_data.slug is not None:
+        team.slug = team_data.slug
+
+    if team_data.is_active is not None:
+        team.is_active = team_data.is_active
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Team slug already exists for this department",
+        )
+
+    db.refresh(team)
+
+    return team
 
 @router.get(
     "/{team_id}",

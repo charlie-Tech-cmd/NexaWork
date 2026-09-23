@@ -493,3 +493,263 @@ def test_list_teams_rejects_another_organization(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Department not found"}
+
+def test_update_team_allows_current_organization(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Current Organization",
+        slug="team-update-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Current Organization Region",
+        slug="team-update-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        region_id=region.id,
+        name="Current Organization Branch",
+        slug="team-update-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Current Organization Department",
+        slug="team-update-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    team = Team(
+        department_id=department.id,
+        name="Old Team Name",
+        slug="old-team-slug",
+    )
+    db_session.add(team)
+
+    user = User(
+        organization_id=organization.id,
+        email="team.update@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Current Organization User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "team.update@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/teams/{team.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={
+            "name": "Updated Team Name",
+            "slug": "updated-team-slug",
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+
+    assert response_data["id"] == team.id
+    assert response_data["name"] == "Updated Team Name"
+    assert response_data["slug"] == "updated-team-slug"
+    assert response_data["is_active"] is False
+
+    db_session.refresh(team)
+
+    assert team.name == "Updated Team Name"
+    assert team.slug == "updated-team-slug"
+    assert team.is_active is False
+
+
+def test_update_team_rejects_another_organization(
+    client,
+    db_session,
+):
+    organization_a = Organization(
+        name="Organization A",
+        slug="team-update-a",
+    )
+    organization_b = Organization(
+        name="Organization B",
+        slug="team-update-b",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    region_b = Region(
+        organization_id=organization_b.id,
+        name="Organization B Region",
+        slug="organization-b-region",
+    )
+    db_session.add(region_b)
+    db_session.flush()
+
+    branch_b = Branch(
+        region_id=region_b.id,
+        name="Organization B Branch",
+        slug="organization-b-branch",
+    )
+    db_session.add(branch_b)
+    db_session.flush()
+
+    department_b = Department(
+        branch_id=branch_b.id,
+        name="Organization B Department",
+        slug="organization-b-department",
+    )
+    db_session.add(department_b)
+    db_session.flush()
+
+    team_b = Team(
+        department_id=department_b.id,
+        name="Organization B Team",
+        slug="organization-b-team",
+    )
+    db_session.add(team_b)
+
+    user_a = User(
+        organization_id=organization_a.id,
+        email="team.update.a@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization A User",
+        is_active=True,
+    )
+    db_session.add(user_a)
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "team.update.a@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/teams/{team_b.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={
+            "name": "Unauthorized Update",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Team not found"}
+
+    db_session.refresh(team_b)
+
+    assert team_b.name == "Organization B Team"
+
+
+def test_update_team_rejects_duplicate_slug(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Current Organization",
+        slug="team-update-duplicate",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Current Organization Region",
+        slug="team-update-duplicate-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        region_id=region.id,
+        name="Current Organization Branch",
+        slug="team-update-duplicate-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Current Organization Department",
+        slug="team-update-duplicate-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    team_one = Team(
+        department_id=department.id,
+        name="Engineering Team",
+        slug="engineering-team",
+    )
+    team_two = Team(
+        department_id=department.id,
+        name="Product Team",
+        slug="product-team",
+    )
+    db_session.add_all([team_one, team_two])
+
+    user = User(
+        organization_id=organization.id,
+        email="team.update.duplicate@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Current Organization User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "team.update.duplicate@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/teams/{team_two.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={
+            "slug": "engineering-team",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Team slug already exists for this department"
+    }
+
+    db_session.refresh(team_two)
+
+    assert team_two.slug == "product-team"
