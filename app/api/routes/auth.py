@@ -12,6 +12,12 @@ from app.models.user import User
 from app.schemas.employee import EmployeeLogin
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 
+from app.models.permission import Permission
+from app.models.role import Role
+from app.models.role_permission import role_permissions
+from app.models.user_role import user_roles
+from app.schemas.user import AdminLogin
+
 router = APIRouter()
 
 
@@ -148,3 +154,72 @@ async def get_current_user_profile(
     current_user: User = Depends(get_current_user),
 ):
     return current_user
+
+@router.post("/auth/admin/login")
+async def admin_login(
+    admin_login: AdminLogin,
+    db: Session = Depends(get_db),
+):
+    db_user = db.scalar(
+        select(User).where(
+            User.email == admin_login.email,
+            User.is_active.is_(True),
+        )
+    )
+
+    if db_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    if not verify_password(
+        admin_login.password,
+        db_user.password_hash,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    admin_role_exists = db.scalar(
+        select(Role.id)
+        .join(
+            user_roles,
+            user_roles.c.role_id == Role.id,
+        )
+        .join(
+            role_permissions,
+            role_permissions.c.role_id == Role.id,
+        )
+        .join(
+            Permission,
+            Permission.id == role_permissions.c.permission_id,
+        )
+        .where(
+            user_roles.c.user_id == db_user.id,
+            Role.organization_id == db_user.organization_id,
+            Role.is_active.is_(True),
+            Permission.name == "USER_CREATE",
+            Permission.is_active.is_(True),
+        )
+    )
+
+    if admin_role_exists is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+    access_token = create_access_token(
+        str(db_user.id),
+        auth_type="admin",
+    )
+
+    return {
+        "message": "Admin login successful",
+        "id": db_user.id,
+        "email": db_user.email,
+        "full_name": db_user.full_name,
+        "access_token": access_token,
+    }

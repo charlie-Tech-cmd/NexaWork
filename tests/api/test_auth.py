@@ -7,6 +7,10 @@ from app.core.security.password import hash_password
 from app.models.organization import Organization
 from app.models.user import User
 
+from app.models.permission import Permission
+from app.models.role import Role
+from app.models.role_permission import role_permissions
+from app.models.user_role import user_roles
 
 def test_login_returns_access_token(client, db_session):
     organization = Organization(
@@ -212,4 +216,113 @@ def test_auth_me_rejects_token_with_wrong_secret(client):
     assert response.status_code == 401
     assert response.json() == {
         "detail": "Invalid or expired token",
+    }
+
+def test_admin_login_returns_admin_token(client, db_session):
+    organization = Organization(
+        name="Admin Login Organization",
+        slug="admin-login-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    permission = Permission(
+        name="USER_CREATE",
+        description="Create users",
+        is_active=True,
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Organization Admin",
+        description="Organization administrator",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="admin.login@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Admin Login User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/auth/admin/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["message"] == "Admin login successful"
+    assert data["id"] == user.id
+    assert data["access_token"]
+
+    payload = jwt.decode(
+        data["access_token"],
+        settings.jwt_secret_key,
+        algorithms=[settings.jwt_algorithm],
+    )
+
+    assert payload["sub"] == str(user.id)
+    assert payload["auth_type"] == "admin"
+
+
+def test_admin_login_rejects_user_without_admin_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Non Admin Organization",
+        slug="non-admin-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="employee.admin.login@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Regular User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/admin/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin access required",
     }
