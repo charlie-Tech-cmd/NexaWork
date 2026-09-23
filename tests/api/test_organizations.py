@@ -41,7 +41,7 @@ def test_get_organization_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/organizations/{organization_b.id}",
+        f"/api/v1/organizations/{organization_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -85,7 +85,7 @@ def test_get_organization_allows_current_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/organizations/{organization.id}",
+        f"/api/v1/organizations/{organization.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 

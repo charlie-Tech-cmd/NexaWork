@@ -21,10 +21,9 @@ from app.schemas.organization import (
 
 
 router = APIRouter(
-    prefix="/organizations",
+    prefix="/api/v1/organizations",
     tags=["organizations"],
 )
-
 
 @router.post(
     "/onboard",
