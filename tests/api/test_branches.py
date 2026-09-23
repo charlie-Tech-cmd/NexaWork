@@ -59,7 +59,7 @@ def test_get_branch_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/branches/{branch_b.id}",
+        f"/api/v1/branches/{branch_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -116,7 +116,7 @@ def test_get_branch_allows_current_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/branches/{branch.id}",
+        f"/api/v1/branches/{branch.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -186,7 +186,7 @@ def test_list_branches_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/branches/regions/{region_b.id}",
+        f"/api/v1/branches/regions/{region_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -239,7 +239,7 @@ def test_create_branch_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.post(
-        f"/branches/regions/{region_b.id}",
+        f"/api/v1/branches/regions/{region_b.id}",
         json={
             "name": "Unauthorized Branch",
             "slug": "unauthorized-branch",

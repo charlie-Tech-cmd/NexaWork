@@ -17,7 +17,7 @@ from app.schemas.branch import (
 
 
 router = APIRouter(
-    prefix="/branches",
+    prefix="/api/v1/branches",
     tags=["branches"],
 )
 
