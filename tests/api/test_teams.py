@@ -55,6 +55,37 @@ def test_create_team_allows_current_organization(
         is_active=True,
     )
     db_session.add(user)
+
+    permission = Permission(
+        name="TEAM_CREATE",
+        description="Create teams",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Team Creator",
+        description="Can create teams",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
     db_session.commit()
 
     login_response = client.post(
@@ -143,6 +174,37 @@ def test_create_team_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+
+    permission = Permission(
+        name="TEAM_CREATE",
+        description="Create teams",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization_a.id,
+        name="Team Creator",
+        description="Can create teams",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user_a.id,
+            role_id=role.id,
+        )
+    )
+
     db_session.commit()
 
     login_response = client.post(

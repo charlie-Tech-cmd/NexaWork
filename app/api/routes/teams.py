@@ -32,7 +32,9 @@ router = APIRouter(
 async def create_team(
     department_id: int,
     team: TeamCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_permission("TEAM_CREATE"),
+    ),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
