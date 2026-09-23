@@ -7,6 +7,7 @@ from app.api.dependencies import (
     get_current_employee,
     get_current_organization,
     get_current_user,
+    require_permission,
 )
 from app.db.session import get_db
 from app.models.employee import Employee
@@ -35,7 +36,7 @@ router = APIRouter(
 )
 async def create_employee(
     employee: EmployeeCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("EMPLOYEE_CREATE")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):

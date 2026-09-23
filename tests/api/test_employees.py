@@ -3,6 +3,10 @@ from app.models.branch import Branch
 from app.models.department import Department
 from app.models.employee import Employee
 from app.models.organization import Organization
+from app.models.permission import Permission
+from app.models.role import Role
+from app.models.role_permission import role_permissions
+from app.models.user_role import user_roles
 from app.models.region import Region
 from app.models.user import User
 from sqlalchemy import select
@@ -228,6 +232,8 @@ def test_list_department_employees_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+    db_session.flush()
+
     db_session.commit()
 
     login_response = client.post(
@@ -298,6 +304,38 @@ def test_create_employee_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_CREATE",
+        description="Create employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization_a.id,
+        name="Employee Creator",
+        description="Can create employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user_a.id,
+            role_id=role.id,
+        )
+    )
+
     db_session.commit()
 
     login_response = client.post(
@@ -334,6 +372,111 @@ def test_create_employee_rejects_another_organization(
     )
 
     assert created_employee is None
+
+def test_create_employee_rejects_user_without_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Employee Permission Organization",
+        slug="employee-permission-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Employee Permission Region",
+        slug="employee-permission-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        region_id=region.id,
+        name="Employee Permission Branch",
+        slug="employee-permission-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Employee Permission Department",
+        slug="employee-permission-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    permission = Permission(
+        name="USER_VIEW",
+        description="View users",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="User Viewer",
+        description="Can view users",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="employee.permission@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Employee Permission User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "employee.permission@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/employees",
+        json={
+            "user_id": user.id,
+            "employee_id": "EMP-PERMISSION-001",
+            "branch_id": branch.id,
+            "department_id": department.id,
+            "job_title": "Software Engineer",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Permission denied"}
+
 
 def test_update_employee_rejects_another_organization_branch(
     client,
