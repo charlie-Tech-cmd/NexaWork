@@ -68,6 +68,36 @@ def test_get_employee_rejects_another_organization(
     db_session.add_all([user_a, user_b])
     db_session.flush()
 
+    permission = Permission(
+        name="EMPLOYEE_VIEW",
+        description="View employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization_a.id,
+        name="Employee Viewer",
+        description="Can view employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user_a.id,
+            role_id=role.id,
+        )
+    )
+
     employee_b = Employee(
         user_id=user_b.id,
         employee_id="EMP-B-001",
@@ -143,6 +173,36 @@ def test_get_employee_allows_current_organization(
     )
     db_session.add(user)
     db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_VIEW",
+        description="View employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Viewer",
+        description="Can view employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
 
     employee = Employee(
         user_id=user.id,
@@ -233,6 +293,36 @@ def test_list_department_employees_rejects_another_organization(
     )
     db_session.add(user_a)
     db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_VIEW",
+        description="View employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization_a.id,
+        name="Employee Viewer",
+        description="Can view employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user_a.id,
+            role_id=role.id,
+        )
+    )
 
     db_session.commit()
 
