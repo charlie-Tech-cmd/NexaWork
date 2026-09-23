@@ -18,7 +18,7 @@ from app.schemas.role import RoleCreate, RoleResponse, RoleUpdate
 from app.schemas.permission import PermissionResponse
 
 router = APIRouter(
-    prefix="/roles",
+    prefix="/api/v1/roles",
     tags=["roles"],
 )
 
