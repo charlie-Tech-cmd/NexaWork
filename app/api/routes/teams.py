@@ -19,7 +19,7 @@ from app.models.user import User
 from app.schemas.team import TeamCreate, TeamResponse, TeamUpdate
 
 router = APIRouter(
-    prefix="/teams",
+    prefix="/api/v1/teams",
     tags=["teams"],
 )
 

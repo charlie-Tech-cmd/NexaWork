@@ -101,7 +101,7 @@ def test_create_team_allows_current_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.post(
-        f"/teams/departments/{department.id}",
+        f"/api/v1/teams/departments/{department.id}",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "department_id": department.id,
@@ -220,7 +220,7 @@ def test_create_team_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.post(
-        f"/teams/departments/{department_b.id}",
+        f"/api/v1/teams/departments/{department_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "department_id": department_b.id,
@@ -334,7 +334,7 @@ def test_get_team_allows_current_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/teams/{team.id}",
+        f"/api/v1/teams/{team.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -449,7 +449,7 @@ def test_get_team_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/teams/{team_b.id}",
+        f"/api/v1/teams/{team_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -557,7 +557,7 @@ def test_list_teams_allows_current_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/teams/departments/{department.id}",
+        f"/api/v1/teams/departments/{department.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -675,7 +675,7 @@ def test_list_teams_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/teams/departments/{department_b.id}",
+        f"/api/v1/teams/departments/{department_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -777,7 +777,7 @@ def test_update_team_allows_current_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.put(
-        f"/teams/{team.id}",
+        f"/api/v1/teams/{team.id}",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "name": "Updated Team Name",
@@ -901,7 +901,7 @@ def test_update_team_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.put(
-        f"/teams/{team_b.id}",
+        f"/api/v1/teams/{team_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "name": "Unauthorized Update",
@@ -1016,7 +1016,7 @@ def test_update_team_rejects_duplicate_slug(
     access_token = login_response.json()["access_token"]
 
     response = client.put(
-        f"/teams/{team_two.id}",
+        f"/api/v1/teams/{team_two.id}",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "slug": "engineering-team",
@@ -1090,7 +1090,7 @@ def test_create_team_rejects_without_permission(
     access_token = login_response.json()["access_token"]
 
     response = client.post(
-        f"/teams/departments/{department.id}",
+        f"/api/v1/teams/departments/{department.id}",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "department_id": department.id,
@@ -1173,7 +1173,7 @@ def test_update_team_rejects_without_permission(
     access_token = login_response.json()["access_token"]
 
     response = client.put(
-        f"/teams/{team.id}",
+        f"/api/v1/teams/{team.id}",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "name": "Unauthorized Update",
@@ -1256,7 +1256,7 @@ def test_list_teams_rejects_without_permission(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/teams/departments/{department.id}",
+        f"/api/v1/teams/departments/{department.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -1358,7 +1358,7 @@ def test_update_team_can_deactivate_team(
     access_token = login_response.json()["access_token"]
 
     response = client.put(
-        f"/teams/{team.id}",
+        f"/api/v1/teams/{team.id}",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "is_active": False,
@@ -1437,7 +1437,7 @@ def test_get_team_rejects_without_permission(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/teams/{team.id}",
+        f"/api/v1/teams/{team.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
