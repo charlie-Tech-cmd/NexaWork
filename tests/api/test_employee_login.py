@@ -179,7 +179,7 @@ def test_employee_login_token_accesses_employee_profile(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        "/employees/me",
+        "/api/v1/employees/me",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 

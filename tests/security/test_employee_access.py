@@ -166,7 +166,7 @@ def test_employee_me_returns_authenticated_employee(client, db_session):
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        "/employees/me",
+        "/api/v1/employees/me",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -196,7 +196,7 @@ def test_employee_me_rejects_inactive_employee(client, db_session):
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        "/employees/me",
+        "/api/v1/employees/me",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 

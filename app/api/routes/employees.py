@@ -24,7 +24,7 @@ from app.schemas.employee import (
 
 
 router = APIRouter(
-    prefix="/employees",
+    prefix="/api/v1/employees",
     tags=["employees"],
 )
 

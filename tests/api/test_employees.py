@@ -121,7 +121,7 @@ def test_get_employee_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/employees/{employee_b.id}",
+        f"/api/v1/employees/{employee_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -227,7 +227,7 @@ def test_get_employee_allows_current_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/employees/{employee.id}",
+        f"/api/v1/employees/{employee.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -339,7 +339,7 @@ def test_list_department_employees_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/employees/departments/{department_b.id}",
+        f"/api/v1/employees/departments/{department_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -441,7 +441,7 @@ def test_create_employee_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.post(
-        "/employees",
+        "/api/v1/employees",
         json={
             "user_id": user_a.id,
             "employee_id": "UNAUTHORIZED-EMP-001",
@@ -553,7 +553,7 @@ def test_create_employee_rejects_user_without_permission(
     access_token = login_response.json()["access_token"]
 
     response = client.post(
-        "/employees",
+        "/api/v1/employees",
         json={
             "user_id": user.id,
             "employee_id": "EMP-PERMISSION-001",
@@ -636,7 +636,7 @@ def test_update_employee_requires_permission(
     access_token = login_response.json()["access_token"]
 
     response = client.put(
-        f"/employees/{employee.id}",
+        f"/api/v1/employees/{employee.id}",
         json={
             "job_title": "Senior Developer",
         },
@@ -762,7 +762,7 @@ def test_update_employee_rejects_another_organization_branch(
     access_token = login_response.json()["access_token"]
 
     response = client.put(
-        f"/employees/{employee_a.id}",
+        f"/api/v1/employees/{employee_a.id}",
         json={
             "branch_id": branch_b.id,
         },
@@ -895,7 +895,7 @@ def test_update_employee_rejects_another_organization_department(
     access_token = login_response.json()["access_token"]
 
     response = client.put(
-        f"/employees/{employee_a.id}",
+        f"/api/v1/employees/{employee_a.id}",
         json={
             "department_id": department_b.id,
         },
