@@ -18,7 +18,7 @@ from app.schemas.department import (
 
 
 router = APIRouter(
-    prefix="/departments",
+    prefix="/api/v1/departments",
     tags=["departments"],
 )
 

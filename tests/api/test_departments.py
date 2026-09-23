@@ -68,7 +68,7 @@ def test_get_department_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/departments/{department_b.id}",
+        f"/api/v1/departments/{department_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -133,7 +133,7 @@ def test_get_department_allows_current_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/departments/{department.id}",
+        f"/api/v1/departments/{department.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -203,7 +203,7 @@ def test_list_departments_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/departments/branches/{branch_b.id}",
+        f"/api/v1/departments/branches/{branch_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -264,7 +264,7 @@ def test_create_department_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.post(
-        f"/departments/branches/{branch_b.id}",
+        f"/api/v1/departments/branches/{branch_b.id}",
         json={
             "name": "Unauthorized Department",
             "slug": "unauthorized-department",
