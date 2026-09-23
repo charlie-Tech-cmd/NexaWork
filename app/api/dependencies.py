@@ -45,6 +45,54 @@ def get_current_user(
 
     return db_user
 
+def get_current_admin(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    try:
+        payload = decode_access_token(token)
+        user_id = int(payload["sub"])
+        auth_type = payload.get("auth_type")
+    except (ValueError, KeyError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
+    if auth_type != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin authentication required",
+        )
+
+    db_user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.is_active.is_(True),
+        )
+    )
+
+    if db_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    organization = db.scalar(
+        select(Organization).where(
+            Organization.id == db_user.organization_id,
+            Organization.is_active.is_(True),
+        )
+    )
+
+    if organization is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization is inactive or unavailable",
+        )
+
+    return db_user
+
 def get_current_employee(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
