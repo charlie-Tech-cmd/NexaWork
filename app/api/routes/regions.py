@@ -15,7 +15,7 @@ from app.schemas.region import (
 )
 
 router = APIRouter(
-    prefix="/regions",
+    prefix="/api/v1/regions",
     tags=["regions"],
 )
 

@@ -50,7 +50,7 @@ def test_get_region_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/regions/{region_b.id}",
+        f"/api/v1/regions/{region_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -99,7 +99,7 @@ def test_get_region_allows_current_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/regions/{region.id}",
+        f"/api/v1/regions/{region.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -166,7 +166,7 @@ def test_list_regions_returns_only_current_organization_regions(
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/regions/organizations/{organization_a.id}",
+        f"/api/v1/regions/organizations/{organization_a.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -218,7 +218,7 @@ def test_create_region_rejects_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.post(
-        f"/regions/organizations/{organization_b.id}",
+        f"/api/v1/regions/organizations/{organization_b.id}",
         json={
             "name": "Unauthorized Region",
             "slug": "unauthorized-region",
