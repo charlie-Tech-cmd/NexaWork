@@ -187,7 +187,7 @@ async def list_department_employees(
 async def update_employee(
     employee_id: int,
     employee_data: EmployeeUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("EMPLOYEE_UPDATE")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):

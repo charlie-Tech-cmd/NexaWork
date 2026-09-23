@@ -568,6 +568,88 @@ def test_create_employee_rejects_user_without_permission(
     assert response.json() == {"detail": "Permission denied"}
 
 
+def test_update_employee_requires_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Organization",
+        slug="employee-update-permission",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Employee Update Permission Region",
+        slug="employee-update-permission-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        region_id=region.id,
+        name="Employee Update Permission Branch",
+        slug="employee-update-permission-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Employee Update Permission Department",
+        slug="employee-update-permission-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="employee.update.permission@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Employee Update Permission User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    employee = Employee(
+        user_id=user.id,
+        employee_id="EMP-UPDATE-PERMISSION-001",
+        branch_id=branch.id,
+        department_id=department.id,
+        job_title="Developer",
+    )
+    db_session.add(employee)
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "employee.update.permission@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/employees/{employee.id}",
+        json={
+            "job_title": "Senior Developer",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Permission denied"}
+
+    db_session.refresh(employee)
+    assert employee.job_title == "Developer"
+
+
 def test_update_employee_rejects_another_organization_branch(
     client,
     db_session,
@@ -626,6 +708,36 @@ def test_update_employee_rejects_another_organization_branch(
     )
     db_session.add(user_a)
     db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_UPDATE",
+        description="Update employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization_a.id,
+        name="Employee Updater",
+        description="Can update employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user_a.id,
+            role_id=role.id,
+        )
+    )
 
     employee_a = Employee(
         user_id=user_a.id,
@@ -729,6 +841,36 @@ def test_update_employee_rejects_another_organization_department(
     )
     db_session.add(user_a)
     db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_UPDATE",
+        description="Update employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization_a.id,
+        name="Employee Updater",
+        description="Can update employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user_a.id,
+            role_id=role.id,
+        )
+    )
 
     employee_a = Employee(
         user_id=user_a.id,
