@@ -3,6 +3,10 @@ from sqlalchemy import select
 from app.models.branch import Branch
 from app.models.department import Department
 from app.models.organization import Organization
+from app.models.permission import Permission
+from app.models.role import Role
+from app.models.role_permission import role_permissions
+from app.models.user_role import user_roles
 from app.models.region import Region
 from app.models.team import Team
 from app.models.user import User
@@ -222,6 +226,37 @@ def test_get_team_allows_current_organization(
         is_active=True,
     )
     db_session.add(user)
+
+    permission = Permission(
+        name="TEAM_VIEW",
+        description="View teams",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Team Viewer",
+        description="Can view teams",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
     db_session.commit()
 
     login_response = client.post(
@@ -306,6 +341,37 @@ def test_get_team_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+
+    permission = Permission(
+        name="TEAM_VIEW",
+        description="View teams",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization_a.id,
+        name="Team Viewer",
+        description="Can view teams",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user_a.id,
+            role_id=role.id,
+        )
+    )
+
     db_session.commit()
 
     login_response = client.post(

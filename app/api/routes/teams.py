@@ -3,7 +3,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_organization, get_current_user
+from app.api.dependencies import (
+    get_current_organization,
+    get_current_user,
+    require_permission,
+)
+
 from app.db.session import get_db
 from app.models.department import Department
 from app.models.branch import Branch
@@ -164,7 +169,9 @@ async def update_team(
 )
 async def get_team(
     team_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_permission("TEAM_VIEW"),
+    ),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
