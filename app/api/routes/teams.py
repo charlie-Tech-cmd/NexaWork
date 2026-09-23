@@ -87,7 +87,9 @@ async def create_team(
 )
 async def list_teams(
     department_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_permission("TEAM_VIEW"),
+    ),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -122,7 +124,9 @@ async def list_teams(
 async def update_team(
     team_id: int,
     team_data: TeamUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_permission("TEAM_UPDATE"),
+    ),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
