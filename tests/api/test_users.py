@@ -27,7 +27,7 @@ def test_list_users_rejects_user_without_permission(client, db_session):
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "users.api.test@example.com",
             "password": "SecurePassword123!",
@@ -100,7 +100,7 @@ def test_list_users_allows_user_with_view_permission(client, db_session):
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "authorized.users@example.com",
             "password": "SecurePassword123!",
@@ -188,7 +188,7 @@ def test_get_user_rejects_user_from_another_organization(client, db_session):
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "organization.a.viewer@example.com",
             "password": "SecurePassword123!",
@@ -263,7 +263,7 @@ def test_create_user_assigns_authenticated_users_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "user.creator@example.com",
             "password": "SecurePassword123!",
@@ -359,7 +359,7 @@ def test_update_user_rejects_user_from_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "organization.a.updater@example.com",
             "password": "SecurePassword123!",
@@ -452,7 +452,7 @@ def test_deactivate_user_rejects_user_from_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "organization.a.deactivator@example.com",
             "password": "SecurePassword123!",

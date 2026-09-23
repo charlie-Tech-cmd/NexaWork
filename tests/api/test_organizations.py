@@ -29,7 +29,7 @@ def test_get_organization_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "organization.api.a@example.com",
             "password": "SecurePassword123!",
@@ -73,7 +73,7 @@ def test_get_organization_allows_current_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "current.organization@example.com",
             "password": "SecurePassword123!",

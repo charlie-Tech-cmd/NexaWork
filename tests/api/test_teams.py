@@ -89,7 +89,7 @@ def test_create_team_allows_current_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.create@example.com",
             "password": "SecurePassword123!",
@@ -208,7 +208,7 @@ def test_create_team_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.create.a@example.com",
             "password": "SecurePassword123!",
@@ -322,7 +322,7 @@ def test_get_team_allows_current_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.get@example.com",
             "password": "SecurePassword123!",
@@ -437,7 +437,7 @@ def test_get_team_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.get.a@example.com",
             "password": "SecurePassword123!",
@@ -545,7 +545,7 @@ def test_list_teams_allows_current_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.list@example.com",
             "password": "SecurePassword123!",
@@ -663,7 +663,7 @@ def test_list_teams_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.list.a@example.com",
             "password": "SecurePassword123!",
@@ -765,7 +765,7 @@ def test_update_team_allows_current_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.update@example.com",
             "password": "SecurePassword123!",
@@ -889,7 +889,7 @@ def test_update_team_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.update.a@example.com",
             "password": "SecurePassword123!",
@@ -1004,7 +1004,7 @@ def test_update_team_rejects_duplicate_slug(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.update.duplicate@example.com",
             "password": "SecurePassword123!",
@@ -1078,7 +1078,7 @@ def test_create_team_rejects_without_permission(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.create.no.permission@example.com",
             "password": "SecurePassword123!",
@@ -1161,7 +1161,7 @@ def test_update_team_rejects_without_permission(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.update.no.permission@example.com",
             "password": "SecurePassword123!",
@@ -1244,7 +1244,7 @@ def test_list_teams_rejects_without_permission(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.list.no.permission@example.com",
             "password": "SecurePassword123!",
@@ -1346,7 +1346,7 @@ def test_update_team_can_deactivate_team(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.deactivate@example.com",
             "password": "SecurePassword123!",
@@ -1425,7 +1425,7 @@ def test_get_team_rejects_without_permission(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "team.get.no.permission@example.com",
             "password": "SecurePassword123!",

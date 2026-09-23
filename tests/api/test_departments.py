@@ -56,7 +56,7 @@ def test_get_department_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "department.api.a@example.com",
             "password": "SecurePassword123!",
@@ -121,7 +121,7 @@ def test_get_department_allows_current_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "current.department@example.com",
             "password": "SecurePassword123!",
@@ -191,7 +191,7 @@ def test_list_departments_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "department.list.a@example.com",
             "password": "SecurePassword123!",
@@ -252,7 +252,7 @@ def test_create_department_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "department.create.a@example.com",
             "password": "SecurePassword123!",

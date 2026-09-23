@@ -67,7 +67,7 @@ def test_employee_login_returns_access_token(client, db_session):
     user, employee = create_employee_login_test_data(db_session)
 
     response = client.post(
-        "/auth/employee/login",
+        "/api/v1/auth/employee/login",
         json={
             "employee_id": employee.employee_id,
             "password": "SecurePassword123!",
@@ -90,7 +90,7 @@ def test_employee_login_rejects_wrong_password(client, db_session):
     _, employee = create_employee_login_test_data(db_session)
 
     response = client.post(
-        "/auth/employee/login",
+        "/api/v1/auth/employee/login",
         json={
             "employee_id": employee.employee_id,
             "password": "WrongPassword123!",
@@ -107,7 +107,7 @@ def test_employee_login_rejects_unknown_employee_id(client, db_session):
     create_employee_login_test_data(db_session)
 
     response = client.post(
-        "/auth/employee/login",
+        "/api/v1/auth/employee/login",
         json={
             "employee_id": "EMP-UNKNOWN-999",
             "password": "SecurePassword123!",
@@ -127,7 +127,7 @@ def test_employee_login_rejects_inactive_employee(client, db_session):
     db_session.commit()
 
     response = client.post(
-        "/auth/employee/login",
+        "/api/v1/auth/employee/login",
         json={
             "employee_id": employee.employee_id,
             "password": "SecurePassword123!",
@@ -147,7 +147,7 @@ def test_employee_login_rejects_inactive_user(client, db_session):
     db_session.commit()
 
     response = client.post(
-        "/auth/employee/login",
+        "/api/v1/auth/employee/login",
         json={
             "employee_id": employee.employee_id,
             "password": "SecurePassword123!",
@@ -167,7 +167,7 @@ def test_employee_login_token_accesses_employee_profile(
     _, employee = create_employee_login_test_data(db_session)
 
     login_response = client.post(
-        "/auth/employee/login",
+        "/api/v1/auth/employee/login",
         json={
             "employee_id": employee.employee_id,
             "password": "SecurePassword123!",

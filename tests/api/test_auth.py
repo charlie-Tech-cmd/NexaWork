@@ -31,7 +31,7 @@ def test_login_returns_access_token(client, db_session):
     db_session.commit()
 
     response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "auth.test@example.com",
             "password": "SecurePassword123!",
@@ -68,7 +68,7 @@ def test_auth_me_returns_authenticated_user(client, db_session):
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "me.test@example.com",
             "password": "SecurePassword123!",
@@ -80,7 +80,7 @@ def test_auth_me_returns_authenticated_user(client, db_session):
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        "/auth/me",
+        "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -94,7 +94,7 @@ def test_auth_me_returns_authenticated_user(client, db_session):
 
 def test_auth_me_rejects_invalid_token(client):
     response = client.get(
-        "/auth/me",
+        "/api/v1/auth/me",
         headers={"Authorization": "Bearer invalid-token"},
     )
 
@@ -122,7 +122,7 @@ def test_auth_me_rejects_inactive_user_token(client, db_session):
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "inactive.test@example.com",
             "password": "SecurePassword123!",
@@ -137,7 +137,7 @@ def test_auth_me_rejects_inactive_user_token(client, db_session):
     db_session.commit()
 
     response = client.get(
-        "/auth/me",
+        "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -148,7 +148,7 @@ def test_auth_me_rejects_inactive_user_token(client, db_session):
 
 
 def test_auth_me_rejects_missing_token(client):
-    response = client.get("/auth/me")
+    response = client.get("/api/v1/auth/me")
 
     assert response.status_code == 401
     assert response.json() == {
@@ -167,7 +167,7 @@ def test_auth_me_rejects_expired_token(client):
     )
 
     response = client.get(
-        "/auth/me",
+        "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {expired_token}"},
     )
 
@@ -188,7 +188,7 @@ def test_auth_me_rejects_token_for_nonexistent_user(client):
     )
 
     response = client.get(
-        "/auth/me",
+        "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"},
     )
 
@@ -209,7 +209,7 @@ def test_auth_me_rejects_token_with_wrong_secret(client):
     )
 
     response = client.get(
-        "/auth/me",
+        "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"},
     )
 
@@ -268,7 +268,7 @@ def test_admin_login_returns_admin_token(client, db_session):
     db_session.commit()
 
     response = client.post(
-        "/auth/admin/login",
+        "/api/v1/auth/admin/login",
         json={
             "email": user.email,
             "password": "SecurePassword123!",
@@ -315,7 +315,7 @@ def test_admin_login_rejects_user_without_admin_permission(
     db_session.commit()
 
     response = client.post(
-        "/auth/admin/login",
+        "/api/v1/auth/admin/login",
         json={
             "email": user.email,
             "password": "SecurePassword123!",

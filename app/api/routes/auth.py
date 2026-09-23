@@ -18,8 +18,7 @@ from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
 from app.schemas.user import AdminLogin
 
-router = APIRouter()
-
+router = APIRouter(prefix="/api/v1")
 
 @router.post("/auth/register", status_code=status.HTTP_201_CREATED)
 async def register_user(

@@ -38,7 +38,7 @@ def test_get_region_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "region.api.a@example.com",
             "password": "SecurePassword123!",
@@ -87,7 +87,7 @@ def test_get_region_allows_current_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "current.region@example.com",
             "password": "SecurePassword123!",
@@ -154,7 +154,7 @@ def test_list_regions_returns_only_current_organization_regions(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "region.list.a@example.com",
             "password": "SecurePassword123!",
@@ -206,7 +206,7 @@ def test_create_region_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "region.create.a@example.com",
             "password": "SecurePassword123!",

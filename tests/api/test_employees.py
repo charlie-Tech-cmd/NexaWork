@@ -109,7 +109,7 @@ def test_get_employee_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "employee.api.a@example.com",
             "password": "SecurePassword123!",
@@ -215,7 +215,7 @@ def test_get_employee_allows_current_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "current.employee@example.com",
             "password": "SecurePassword123!",
@@ -327,7 +327,7 @@ def test_list_department_employees_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "employee.list.a@example.com",
             "password": "SecurePassword123!",
@@ -429,7 +429,7 @@ def test_create_employee_rejects_another_organization(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "employee.create.a@example.com",
             "password": "SecurePassword123!",
@@ -541,7 +541,7 @@ def test_create_employee_rejects_user_without_permission(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "employee.permission@example.com",
             "password": "SecurePassword123!",
@@ -624,7 +624,7 @@ def test_update_employee_requires_permission(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "employee.update.permission@example.com",
             "password": "SecurePassword123!",
@@ -750,7 +750,7 @@ def test_update_employee_rejects_another_organization_branch(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "employee.update.branch.a@example.com",
             "password": "SecurePassword123!",
@@ -883,7 +883,7 @@ def test_update_employee_rejects_another_organization_department(
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": "employee.update.department.a@example.com",
             "password": "SecurePassword123!",

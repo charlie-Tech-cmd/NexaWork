@@ -154,7 +154,7 @@ def test_employee_me_returns_authenticated_employee(client, db_session):
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user.email,
             "password": "SecurePassword123!",
@@ -184,7 +184,7 @@ def test_employee_me_rejects_inactive_employee(client, db_session):
     db_session.commit()
 
     login_response = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user.email,
             "password": "SecurePassword123!",
