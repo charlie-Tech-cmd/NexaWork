@@ -1190,3 +1190,75 @@ def test_update_team_rejects_without_permission(
     assert team.name == "Original Team Name"
     assert team.slug == "original-team-slug"
     assert team.is_active is True
+
+def test_list_teams_rejects_without_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Current Organization",
+        slug="team-list-no-permission",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Current Organization Region",
+        slug="team-list-no-permission-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        region_id=region.id,
+        name="Current Organization Branch",
+        slug="team-list-no-permission-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Current Organization Department",
+        slug="team-list-no-permission-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    team = Team(
+        department_id=department.id,
+        name="Engineering Team",
+        slug="engineering-team",
+    )
+    db_session.add(team)
+
+    user = User(
+        organization_id=organization.id,
+        email="team.list.no.permission@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="No Permission User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "team.list.no.permission@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/teams/departments/{department.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Permission denied"}
