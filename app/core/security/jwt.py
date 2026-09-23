@@ -6,7 +6,10 @@ from jwt.exceptions import InvalidTokenError
 from app.core.config import settings
 
 
-def create_access_token(subject: str) -> str:
+def create_access_token(
+    subject: str,
+    auth_type: str | None = None,
+) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=settings.jwt_access_token_expire_minutes
     )
@@ -15,6 +18,9 @@ def create_access_token(subject: str) -> str:
         "sub": subject,
         "exp": expires_at,
     }
+
+    if auth_type is not None:
+        payload["auth_type"] = auth_type
 
     return jwt.encode(
         payload,

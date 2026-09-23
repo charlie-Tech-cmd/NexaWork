@@ -50,3 +50,11 @@ def test_decode_access_token_rejects_wrong_secret():
 def test_decode_access_token_rejects_malformed_token():
     with pytest.raises(ValueError, match="Invalid or expired token"):
         decode_access_token("not-a-valid-jwt")
+
+def test_create_access_token_preserves_auth_type():
+    token = create_access_token("123", auth_type="admin")
+
+    payload = decode_access_token(token)
+
+    assert payload["sub"] == "123"
+    assert payload["auth_type"] == "admin"
