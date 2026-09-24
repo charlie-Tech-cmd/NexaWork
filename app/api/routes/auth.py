@@ -180,9 +180,22 @@ async def get_current_user_profile(
 
 @router.post("/auth/admin/login")
 async def admin_login(
+    request: Request,
     admin_login: AdminLogin,
     db: Session = Depends(get_db),
 ):
+
+    login_key = (
+        f"admin-login:{request.client.host}:"
+        f"{admin_login.email.lower()}"
+    )
+
+    if not is_login_allowed(login_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later.",
+        )
+
     db_user = db.scalar(
         select(User).where(
             User.email == admin_login.email,
