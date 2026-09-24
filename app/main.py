@@ -15,8 +15,10 @@ from app.api.routes.users import router as users_router
 from app.api.routes.teams import router as teams_router
 from app.core.config import settings
 from app.core.logging import configure_logging
-from app.core.middleware import request_logging_middleware
-
+from app.core.middleware import (
+    request_logging_middleware,
+    security_headers_middleware,
+)
 
 configure_logging()
 
@@ -31,6 +33,7 @@ app.add_middleware(
 )
 
 app.middleware("http")(request_logging_middleware)
+app.middleware("http")(security_headers_middleware)
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(organizations_router)

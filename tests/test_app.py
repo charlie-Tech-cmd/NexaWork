@@ -45,3 +45,11 @@ def test_cors_allows_configured_origin(client):
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
     assert response.headers["access-control-allow-credentials"] == "true"
+
+
+def test_security_headers_are_present(client):
+    response = client.get("/health")
+
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
