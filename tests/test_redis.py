@@ -51,3 +51,33 @@ def test_expire_key_sets_expiration(monkeypatch):
     expire_key("test:key", 60)
 
     assert calls == [("test:key", 60)]
+
+
+def test_rate_limit_allows_attempt_within_limit(monkeypatch):
+    calls = []
+
+    def fake_incr(key):
+        calls.append(("incr", key))
+        return 1
+
+    def fake_expire(key, seconds):
+        calls.append(("expire", key, seconds))
+
+    monkeypatch.setattr(redis_client, "incr", fake_incr)
+    monkeypatch.setattr(redis_client, "expire", fake_expire)
+
+    from app.core.redis import check_rate_limit
+
+    assert check_rate_limit("rate:test", 5, 60) is True
+    assert calls == [
+        ("incr", "rate:test"),
+        ("expire", "rate:test", 60),
+    ]
+
+
+def test_rate_limit_rejects_attempt_over_limit(monkeypatch):
+    monkeypatch.setattr(redis_client, "incr", lambda key: 6)
+
+    from app.core.redis import check_rate_limit
+
+    assert check_rate_limit("rate:test", 5, 60) is False

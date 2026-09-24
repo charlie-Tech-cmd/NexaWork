@@ -24,3 +24,10 @@ def increment_value(key: str) -> int:
 def expire_key(key: str, expire_seconds: int) -> None:
     redis_client.expire(key, expire_seconds)
 
+def check_rate_limit(key: str, max_attempts: int, window_seconds: int) -> bool:
+    attempts = increment_value(key)
+
+    if attempts == 1:
+        expire_key(key, window_seconds)
+
+    return attempts <= max_attempts
