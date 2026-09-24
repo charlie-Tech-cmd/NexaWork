@@ -31,3 +31,17 @@ def test_readiness_endpoint_returns_503_when_database_fails(client):
 
     assert response.status_code == 503
     assert response.json() == {"detail": "NexaWork API is not ready"}
+
+
+def test_cors_allows_configured_origin(client):
+    response = client.options(
+        "/health",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert response.headers["access-control-allow-credentials"] == "true"
