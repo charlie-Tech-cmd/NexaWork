@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     app_name: str = "NexaWork"
     environment: str = "development"
     cors_origins: str = "http://localhost:3000"
+    redis_url: str = "redis://localhost:6379/0"
 
     @property
     def cors_origin_list(self) -> list[str]:
