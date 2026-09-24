@@ -53,3 +53,14 @@ def test_security_headers_are_present(client):
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
     assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+
+def test_rate_limit_settings_defaults():
+    from app.core.config import Settings
+
+    test_settings = Settings(
+        _env_file=None,
+        jwt_secret_key="test-secret",
+    )
+
+    assert test_settings.rate_limit_max_attempts == 5
+    assert test_settings.rate_limit_window_seconds == 60    

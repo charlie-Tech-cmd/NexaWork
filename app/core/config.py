@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     redis_url: str = "redis://localhost:6379/0"
 
+    rate_limit_max_attempts: int = 5
+    rate_limit_window_seconds: int = 60
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [
