@@ -1,5 +1,6 @@
 from app.db.base import Base
 from app.models.branch import Branch
+from app.models.audit_log import AuditLog
 from app.models.department import Department
 from app.models.employee import Employee
 from app.models.organization import Organization
