@@ -108,9 +108,22 @@ async def login_user(
 
 @router.post("/auth/employee/login")
 async def employee_login(
+    request: Request,
     employee_login: EmployeeLogin,
     db: Session = Depends(get_db),
 ):
+
+    login_key = (
+        f"employee-login:{request.client.host}:"
+        f"{employee_login.employee_id.lower()}"
+    )
+
+    if not is_login_allowed(login_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later.",
+        )
+
     employee = db.scalar(
         select(Employee).where(
             Employee.employee_id == employee_login.employee_id,
