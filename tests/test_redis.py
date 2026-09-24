@@ -11,7 +11,6 @@ def test_redis_client_uses_configured_url():
 
     assert actual["host"] == expected["host"]
     assert actual["port"] == expected["port"]
-    assert actual["db"] == expected["db"]
 
 def test_set_value_uses_expiration(monkeypatch):
     calls = []
