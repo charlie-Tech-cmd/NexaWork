@@ -16,7 +16,7 @@ from app.schemas.role import RoleResponse
 
 
 router = APIRouter(
-    prefix="/users",
+    prefix="/api/v1/users",
     tags=["user-roles"],
 )
 
