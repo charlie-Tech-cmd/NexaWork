@@ -11,6 +11,7 @@ from app.models.permission import Permission
 from app.models.role import Role
 from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
+from unittest.mock import patch
 
 def test_login_returns_access_token(client, db_session):
     organization = Organization(
@@ -30,24 +31,25 @@ def test_login_returns_access_token(client, db_session):
     db_session.add(user)
     db_session.commit()
 
-    response = client.post(
-        "/api/v1/auth/login",
-        json={
-            "email": "auth.test@example.com",
-            "password": "SecurePassword123!",
-        },
-    )
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=True,
+    ):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "auth.test@example.com",
+                "password": "SecurePassword123!",
+            },
+        )
 
     assert response.status_code == 200
-
     data = response.json()
-
     assert data["message"] == "Login successful"
     assert data["id"] == user.id
-    assert data["email"] == "auth.test@example.com"
+    assert data["email"] == user.email
     assert "access_token" in data
     assert data["access_token"]
-
 
 def test_auth_me_returns_authenticated_user(client, db_session):
     organization = Organization(
@@ -67,13 +69,17 @@ def test_auth_me_returns_authenticated_user(client, db_session):
     db_session.add(user)
     db_session.commit()
 
-    login_response = client.post(
-        "/api/v1/auth/login",
-        json={
-            "email": "me.test@example.com",
-            "password": "SecurePassword123!",
-        },
-    )
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=True,
+    ):
+        login_response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "me.test@example.com",
+                "password": "SecurePassword123!",
+            },
+        )
 
     assert login_response.status_code == 200
 
@@ -121,13 +127,17 @@ def test_auth_me_rejects_inactive_user_token(client, db_session):
     db_session.add(user)
     db_session.commit()
 
-    login_response = client.post(
-        "/api/v1/auth/login",
-        json={
-            "email": "inactive.test@example.com",
-            "password": "SecurePassword123!",
-        },
-    )
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=True,
+    ):
+        login_response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "inactive.test@example.com",
+                "password": "SecurePassword123!",
+            },
+        )
 
     assert login_response.status_code == 200
 
@@ -326,3 +336,21 @@ def test_admin_login_rejects_user_without_admin_permission(
     assert response.json() == {
         "detail": "Admin access required",
     }
+
+def test_login_rejects_rate_limited_request(client):
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=False,
+    ):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "blocked@example.com",
+                "password": "SecurePassword123!",
+            },
+        )
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == (
+        "Too many login attempts. Please try again later."
+    )

@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.dependencies import get_db
 from app.db.base import Base
 from app.main import app
+from unittest.mock import patch
 
 
 @pytest.fixture
@@ -42,7 +43,11 @@ def client(db_session: Session):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    with TestClient(app) as test_client:
-        yield test_client
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=True,
+    ):
+        with TestClient(app) as test_client:
+            yield test_client
 
     app.dependency_overrides.clear()

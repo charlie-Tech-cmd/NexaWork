@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.api.dependencies import get_current_user
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security.password import hash_password, verify_password
 from app.core.security.jwt import create_access_token
+from app.core.rate_limit import is_login_allowed
 from app.db.session import get_db
 from app.models.employee import Employee
 from app.models.user import User
@@ -55,9 +56,19 @@ async def register_user(
 
 @router.post("/auth/login")
 async def login_user(
+    request: Request,
     user: UserLogin,
     db: Session = Depends(get_db),
 ):
+
+    login_key = f"login:{request.client.host}:{user.email.lower()}"
+
+    if not is_login_allowed(login_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later.",
+        )
+
     db_user = db.scalar(
         select(User).where(User.email == user.email)
     )
