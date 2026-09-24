@@ -39,7 +39,7 @@ def test_list_users_rejects_user_without_permission(client, db_session):
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        "/users",
+        "/api/v1/users",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -112,7 +112,7 @@ def test_list_users_allows_user_with_view_permission(client, db_session):
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        "/users",
+        "/api/v1/users",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -200,7 +200,7 @@ def test_get_user_rejects_user_from_another_organization(client, db_session):
     access_token = login_response.json()["access_token"]
 
     response = client.get(
-        f"/users/{user_b.id}",
+        f"/api/v1/users/{user_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -275,7 +275,7 @@ def test_create_user_assigns_authenticated_users_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.post(
-        "/users",
+        "/api/v1/users",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "email": "created.user@example.com",
@@ -371,7 +371,7 @@ def test_update_user_rejects_user_from_another_organization(
     access_token = login_response.json()["access_token"]
 
     response = client.put(
-        f"/users/{user_b.id}",
+        f"/api/v1/users/{user_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "full_name": "Unauthorized Cross-Tenant Update",
@@ -465,7 +465,7 @@ def test_deactivate_user_rejects_user_from_another_organization(
 
     response = client.request(
         "DELETE",
-        f"/users/{user_b.id}",
+        f"/api/v1/users/{user_b.id}",
         headers={"Authorization": f"Bearer {access_token}"},
         json={
             "password": "SecurePassword123!",
