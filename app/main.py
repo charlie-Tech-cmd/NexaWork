@@ -14,6 +14,7 @@ from app.api.routes.users import router as users_router
 from app.api.routes.teams import router as teams_router
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.core.middleware import request_logging_middleware
 
 from app.core.config import settings
 from app.core.logging import configure_logging
@@ -22,6 +23,8 @@ from app.core.logging import configure_logging
 configure_logging()
 
 app = FastAPI(title=f"{settings.app_name} API")
+
+app.middleware("http")(request_logging_middleware)
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(organizations_router)

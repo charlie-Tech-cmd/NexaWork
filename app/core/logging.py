@@ -1,5 +1,7 @@
 import logging
 
+request_logger = logging.getLogger("nexawork.request")
+
 
 def configure_logging() -> None:
     logging.basicConfig(
