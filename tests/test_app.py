@@ -63,4 +63,24 @@ def test_rate_limit_settings_defaults():
     )
 
     assert test_settings.rate_limit_max_attempts == 5
-    assert test_settings.rate_limit_window_seconds == 60    
+    assert test_settings.rate_limit_window_seconds == 60
+
+def test_unexpected_exception_is_logged(client, caplog):
+    caplog.set_level("ERROR", logger="nexawork.request")
+
+    @app.get("/test-monitoring-error")
+    async def monitoring_error():
+        raise RuntimeError("test failure")
+
+    from fastapi.testclient import TestClient
+
+    test_client = TestClient(
+        app,
+        raise_server_exceptions=False,
+    )
+
+    response = test_client.get("/test-monitoring-error")
+
+    assert response.status_code == 500
+    assert "GET /test-monitoring-error -> 500" in caplog.text
+    assert "RuntimeError: test failure" in caplog.text        

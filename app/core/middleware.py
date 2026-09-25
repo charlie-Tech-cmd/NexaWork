@@ -8,7 +8,17 @@ from app.core.logging import request_logger
 async def request_logging_middleware(request: Request, call_next):
     start_time = time.perf_counter()
 
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:
+        duration = time.perf_counter() - start_time
+        request_logger.exception(
+            "%s %s -> 500 (%.3fs)",
+            request.method,
+            request.url.path,
+            duration,
+        )
+        raise
 
     duration = time.perf_counter() - start_time
 
