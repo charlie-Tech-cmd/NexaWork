@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import (
     get_current_organization,
-    get_current_user,
+    require_permission,
 )
 
 from app.db.session import get_db
@@ -30,7 +30,9 @@ router = APIRouter(
 )
 async def create_role(
     role: RoleCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_permission("ROLE_CREATE")
+    ),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -61,7 +63,9 @@ async def create_role(
     response_model=list[RoleResponse],
 )
 async def list_roles(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_permission("ROLE_VIEW")
+    ),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -79,7 +83,9 @@ async def list_roles(
 )
 async def get_role(
     role_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_permission("ROLE_VIEW")
+    ),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -105,7 +111,10 @@ async def get_role(
 async def update_role(
     role_id: int,
     role_data: RoleUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_permission("ROLE_UPDATE")
+    ),
+    
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -144,6 +153,36 @@ async def update_role(
 
     return role
 
+@router.delete(
+    "/{role_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_role(
+    role_id: int,
+    current_user: User = Depends(
+        require_permission("ROLE_DELETE")
+    ),
+    current_organization: Organization = Depends(
+        get_current_organization
+    ),
+    db: Session = Depends(get_db),
+):
+    role = db.scalar(
+        select(Role).where(
+            Role.id == role_id,
+            Role.organization_id == current_organization.id,
+        )
+    )
+
+    if role is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Role not found",
+        )
+
+    db.delete(role)
+    db.commit()    
+
 @router.post(
     "/{role_id}/permissions/{permission_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -151,7 +190,9 @@ async def update_role(
 async def assign_permission_to_role(
     role_id: int,
     permission_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+    require_permission("ROLE_UPDATE")
+    ),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -204,8 +245,9 @@ async def assign_permission_to_role(
 )
 async def list_role_permissions(
     role_id: int,
-    current_user: User = Depends(get_current_user),
-    current_organization: Organization = Depends(get_current_organization),
+    current_user: User = Depends(
+        require_permission("ROLE_VIEW")
+    ),    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
     role = db.scalar(
@@ -240,8 +282,9 @@ async def list_role_permissions(
 async def remove_permission_from_role(
     role_id: int,
     permission_id: int,
-    current_user: User = Depends(get_current_user),
-    current_organization: Organization = Depends(get_current_organization),
+    current_user: User = Depends(
+        require_permission("ROLE_UPDATE")
+    ),    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
 
