@@ -93,7 +93,7 @@ async def get_permission(
 async def update_permission(
     permission_id: int,
     permission_data: PermissionUpdate,
-    current_user: User = Depends(require_permission("USER_VIEW")),
+    current_user: User = Depends(require_permission("USER_UPDATE")),
     db: Session = Depends(get_db),
 ):
     permission = db.get(Permission, permission_id)
