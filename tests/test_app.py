@@ -59,7 +59,7 @@ def test_rate_limit_settings_defaults():
 
     test_settings = Settings(
         _env_file=None,
-        jwt_secret_key="test-secret",
+        jwt_secret_key="test-secret-nexawork-@l2e-testing",
     )
 
     assert test_settings.rate_limit_max_attempts == 5
