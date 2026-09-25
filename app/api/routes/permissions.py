@@ -28,7 +28,9 @@ router = APIRouter(
 async def create_permission(
     permission: PermissionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("USER_VIEW")),
+    current_user: User = Depends(
+        require_permission("PERMISSION_CREATE")
+    ),
 ):
     new_permission = Permission(
         name=permission.name,
@@ -56,7 +58,9 @@ async def create_permission(
     response_model=list[PermissionResponse],
 )
 async def list_permissions(
-    current_user: User = Depends(require_permission("USER_VIEW")),
+    current_user: User = Depends(
+        require_permission("PERMISSION_VIEW")
+    ),
     db: Session = Depends(get_db),
 ):
     permissions = db.scalars(
@@ -72,7 +76,9 @@ async def list_permissions(
 )
 async def get_permission(
     permission_id: int,
-    current_user: User = Depends(require_permission("USER_VIEW")),
+    current_user: User = Depends(
+        require_permission("PERMISSION_VIEW")
+    ),
     db: Session = Depends(get_db),
 ):
     permission = db.get(Permission, permission_id)
@@ -93,8 +99,9 @@ async def get_permission(
 async def update_permission(
     permission_id: int,
     permission_data: PermissionUpdate,
-    current_user: User = Depends(require_permission("USER_UPDATE")),
-    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_permission("PERMISSION_UPDATE")
+    ),    db: Session = Depends(get_db),
 ):
     permission = db.get(Permission, permission_id)
 
@@ -125,3 +132,27 @@ async def update_permission(
     db.refresh(permission)
 
     return permission
+
+@router.delete(
+    "/{permission_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_permission(
+    permission_id: int,
+    current_user: User = Depends(
+        require_permission("PERMISSION_DELETE")
+    ),
+    db: Session = Depends(get_db),
+):
+    permission = db.get(Permission, permission_id)
+
+    if permission is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Permission not found",
+        )
+
+    db.delete(permission)
+    db.commit()
+
+    return None    
