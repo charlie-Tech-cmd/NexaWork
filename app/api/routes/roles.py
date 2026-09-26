@@ -87,7 +87,9 @@ async def get_role(
     current_user: User = Depends(
         require_permission("ROLE_VIEW")
     ),
-    current_organization: Organization = Depends(get_current_organization),
+    current_organization: Organization = Depends(
+        get_current_organization
+    ),
     db: Session = Depends(get_db),
 ):
     role = db.scalar(
