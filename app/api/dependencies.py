@@ -212,4 +212,38 @@ def require_any_permission(*permission_names: str):
         return current_user
 
     return permission_dependency
-    
+
+def require_admin_access(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> User:
+    permission_exists = db.scalar(
+        select(Permission.id)
+        .join(
+            role_permissions,
+            role_permissions.c.permission_id == Permission.id,
+        )
+        .join(
+            user_roles,
+            user_roles.c.role_id == role_permissions.c.role_id,
+        )
+        .join(
+            Role,
+            Role.id == user_roles.c.role_id,
+        )
+        .where(
+            user_roles.c.user_id == current_admin.id,
+            Permission.name == "ADMIN_ACCESS",
+            Permission.is_active.is_(True),
+            Role.is_active.is_(True),
+            Role.organization_id == current_admin.organization_id,
+        )
+    )
+
+    if permission_exists is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin permission required",
+        )
+
+    return current_admin

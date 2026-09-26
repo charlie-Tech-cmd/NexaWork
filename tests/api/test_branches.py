@@ -30,10 +30,12 @@ def test_get_branch_rejects_another_organization(
     db_session.flush()
 
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
+
     db_session.add(branch_b)
 
     user_a = User(
@@ -87,6 +89,7 @@ def test_get_branch_allows_current_organization(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
         slug="current-organization-branch",
@@ -157,10 +160,12 @@ def test_list_branches_rejects_another_organization(
     db_session.flush()
 
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
+
     db_session.add(branch_b)
 
     user_a = User(

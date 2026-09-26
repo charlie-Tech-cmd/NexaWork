@@ -18,6 +18,12 @@ class Branch(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+
+    organization_id: Mapped[int] = mapped_column(
+    ForeignKey("organizations.id"),
+    nullable=False,
+    index=True,
+)
     region_id: Mapped[int] = mapped_column(
         ForeignKey("regions.id"),
         nullable=False,

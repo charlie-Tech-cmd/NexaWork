@@ -51,3 +51,29 @@ def client(db_session: Session):
             yield test_client
 
     app.dependency_overrides.clear()
+
+@pytest.fixture
+def organization(db_session):
+    organization = Organization(
+        name="Test Organization",
+        slug="test-organization",
+    )
+
+    db_session.add(organization)
+    db_session.flush()
+
+    return organization
+
+@pytest.fixture
+def branch(db_session, organization, region):
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Test Branch",
+        slug="test-branch",
+    )
+
+    db_session.add(branch)
+    db_session.flush()
+
+    return branch

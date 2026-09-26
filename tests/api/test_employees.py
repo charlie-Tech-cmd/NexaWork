@@ -32,14 +32,17 @@ def test_get_employee_rejects_another_organization(
         name="Organization B Region",
         slug="organization-b-region",
     )
+
     db_session.add(region_b)
     db_session.flush()
 
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
+
     db_session.add(branch_b)
     db_session.flush()
 
@@ -48,6 +51,7 @@ def test_get_employee_rejects_another_organization(
         name="Organization B Department",
         slug="organization-b-department",
     )
+
     db_session.add(department_b)
     db_session.flush()
 
@@ -99,12 +103,14 @@ def test_get_employee_rejects_another_organization(
     )
 
     employee_b = Employee(
+        organization_id=organization_b.id,
         user_id=user_b.id,
         employee_id="EMP-B-001",
         branch_id=branch_b.id,
         department_id=department_b.id,
         job_title="Developer",
     )
+
     db_session.add(employee_b)
     db_session.commit()
 
@@ -149,6 +155,7 @@ def test_get_employee_allows_current_organization(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
         slug="current-organization-branch",
@@ -205,12 +212,14 @@ def test_get_employee_allows_current_organization(
     )
 
     employee = Employee(
+        organization_id=organization.id,
         user_id=user.id,
         employee_id="EMP-CURRENT-001",
         branch_id=branch.id,
         department_id=department.id,
         job_title="Software Engineer",
     )
+
     db_session.add(employee)
     db_session.commit()
 
@@ -270,10 +279,12 @@ def test_list_department_employees_rejects_another_organization(
     db_session.flush()
 
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
+
     db_session.add(branch_b)
     db_session.flush()
 
@@ -371,10 +382,12 @@ def test_create_employee_rejects_another_organization(
     db_session.flush()
 
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
+
     db_session.add(branch_b)
     db_session.flush()
 
@@ -483,6 +496,7 @@ def test_create_employee_rejects_user_without_permission(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Employee Permission Branch",
         slug="employee-permission-branch",
@@ -588,6 +602,7 @@ def test_update_employee_requires_permission(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Employee Update Permission Branch",
         slug="employee-update-permission-branch",
@@ -614,12 +629,14 @@ def test_update_employee_requires_permission(
     db_session.flush()
 
     employee = Employee(
+        organization_id=organization.id,
         user_id=user.id,
         employee_id="EMP-UPDATE-PERMISSION-001",
         branch_id=branch.id,
         department_id=department.id,
         job_title="Developer",
     )
+
     db_session.add(employee)
     db_session.commit()
 
@@ -679,15 +696,19 @@ def test_update_employee_rejects_another_organization_branch(
     db_session.flush()
 
     branch_a = Branch(
+        organization_id=organization_a.id,
         region_id=region_a.id,
         name="Organization A Branch",
         slug="organization-a-branch",
     )
+
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
+
     db_session.add_all([branch_a, branch_b])
     db_session.flush()
 
@@ -696,6 +717,7 @@ def test_update_employee_rejects_another_organization_branch(
         name="Organization A Department",
         slug="organization-a-department",
     )
+
     db_session.add(department_a)
     db_session.flush()
 
@@ -706,6 +728,7 @@ def test_update_employee_rejects_another_organization_branch(
         full_name="Organization A Employee",
         is_active=True,
     )
+
     db_session.add(user_a)
     db_session.flush()
 
@@ -713,6 +736,7 @@ def test_update_employee_rejects_another_organization_branch(
         name="EMPLOYEE_UPDATE",
         description="Update employees",
     )
+
     db_session.add(permission)
     db_session.flush()
 
@@ -740,12 +764,14 @@ def test_update_employee_rejects_another_organization_branch(
     )
 
     employee_a = Employee(
+        organization_id=organization_a.id,
         user_id=user_a.id,
         employee_id="EMP-UPDATE-BRANCH-001",
         branch_id=branch_a.id,
         department_id=department_a.id,
         job_title="Developer",
     )
+
     db_session.add(employee_a)
     db_session.commit()
 
@@ -807,15 +833,19 @@ def test_update_employee_rejects_another_organization_department(
     db_session.flush()
 
     branch_a = Branch(
+        organization_id=organization_a.id,
         region_id=region_a.id,
         name="Organization A Branch",
         slug="organization-a-branch",
     )
+
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
+
     db_session.add_all([branch_a, branch_b])
     db_session.flush()
 
@@ -873,6 +903,7 @@ def test_update_employee_rejects_another_organization_department(
     )
 
     employee_a = Employee(
+        organization_id=organization_a.id,
         user_id=user_a.id,
         employee_id="EMP-UPDATE-DEPARTMENT-001",
         branch_id=branch_a.id,

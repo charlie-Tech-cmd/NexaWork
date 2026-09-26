@@ -48,6 +48,7 @@ async def create_branch(
         )
 
     new_branch = Branch(
+        organization_id=current_organization.id,
         region_id=region_id,
         name=branch.name,
         slug=branch.slug,
@@ -80,11 +81,9 @@ async def get_branch(
     db: Session = Depends(get_db),
 ):
     branch = db.scalar(
-        select(Branch)
-        .join(Region, Branch.region_id == Region.id)
-        .where(
+        select(Branch).where(
             Branch.id == branch_id,
-            Region.organization_id == current_organization.id,
+            Branch.organization_id == current_organization.id,
         )
     )
 
@@ -122,56 +121,11 @@ async def list_branches(
 
     branches = db.scalars(
         select(Branch)
-        .where(Branch.region_id == region_id)
+        .where(
+            Branch.region_id == region_id,
+            Branch.organization_id == current_organization.id,
+        )
         .order_by(Branch.id)
     ).all()
 
     return branches
-
-@router.put(
-    "/{branch_id}",
-    response_model=BranchResponse,
-)
-async def update_branch(
-    branch_id: int,
-    branch_data: BranchUpdate,
-    current_user: User = Depends(get_current_user),
-    current_organization: Organization = Depends(get_current_organization),
-    db: Session = Depends(get_db),
-):
-    branch = db.scalar(
-        select(Branch)
-        .join(Region, Branch.region_id == Region.id)
-        .where(
-            Branch.id == branch_id,
-            Region.organization_id == current_organization.id,
-        )
-    )
-
-    if branch is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Branch not found",
-        )
-
-    if branch_data.name is not None:
-        branch.name = branch_data.name
-
-    if branch_data.slug is not None:
-        branch.slug = branch_data.slug
-
-    if branch_data.is_active is not None:
-        branch.is_active = branch_data.is_active
-
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Branch slug already exists for this region",
-        )
-
-    db.refresh(branch)
-
-    return branch

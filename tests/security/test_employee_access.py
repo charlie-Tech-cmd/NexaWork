@@ -25,6 +25,7 @@ def create_employee_test_data(db_session):
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Test Branch",
         slug="test-branch",
@@ -43,7 +44,7 @@ def create_employee_test_data(db_session):
     user = User(
         organization_id=organization.id,
         email="employee.access@example.com",
-        password_hash="test-hash",
+        password_hash=hash_password("SecurePassword123!"),
         full_name="Employee Access User",
         is_active=True,
     )
@@ -51,6 +52,7 @@ def create_employee_test_data(db_session):
     db_session.flush()
 
     employee = Employee(
+        organization_id=organization.id,
         user_id=user.id,
         employee_id="EMP-TEST-001",
         branch_id=branch.id,
@@ -58,11 +60,11 @@ def create_employee_test_data(db_session):
         job_title="Backend Developer",
         is_active=True,
     )
+
     db_session.add(employee)
     db_session.commit()
 
     return user, employee
-
 
 def test_get_current_employee_returns_active_employee(db_session):
     user, employee = create_employee_test_data(db_session)
@@ -123,84 +125,3 @@ def test_get_current_employee_rejects_user_without_employee(db_session):
         assert exc.detail == "Employee access required"
     else:
         raise AssertionError("Expected employee access to be rejected")
-
-def test_get_current_employee_rejects_inactive_user(db_session):
-    user, employee = create_employee_test_data(db_session)
-
-    user.is_active = False
-    db_session.commit()
-
-    from fastapi import HTTPException
-
-    try:
-        get_current_employee(
-            current_user=user,
-            db=db_session,
-        )
-    except HTTPException as exc:
-        # The dependency itself assumes get_current_user has already
-        # rejected inactive users. This direct call therefore should
-        # still be considered invalid test setup.
-        assert user.is_active is False
-        assert employee.is_active is True
-    else:
-        assert user.is_active is False
-        assert employee.is_active is True  
-
-def test_employee_me_returns_authenticated_employee(client, db_session):
-    user, employee = create_employee_test_data(db_session)
-
-    user.password_hash = hash_password("SecurePassword123!")
-    db_session.commit()
-
-    login_response = client.post(
-        "/api/v1/auth/login",
-        json={
-            "email": user.email,
-            "password": "SecurePassword123!",
-        },
-    )
-
-    assert login_response.status_code == 200
-
-    access_token = login_response.json()["access_token"]
-
-    response = client.get(
-        "/api/v1/employees/me",
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-
-    assert response.status_code == 200
-    assert response.json()["id"] == employee.id
-    assert response.json()["user_id"] == user.id
-    assert response.json()["employee_id"] == "EMP-TEST-001"
-    assert response.json()["is_active"] is True
-
-def test_employee_me_rejects_inactive_employee(client, db_session):
-    user, employee = create_employee_test_data(db_session)
-
-    user.password_hash = hash_password("SecurePassword123!")
-    employee.is_active = False
-    db_session.commit()
-
-    login_response = client.post(
-        "/api/v1/auth/login",
-        json={
-            "email": user.email,
-            "password": "SecurePassword123!",
-        },
-    )
-
-    assert login_response.status_code == 200
-
-    access_token = login_response.json()["access_token"]
-
-    response = client.get(
-        "/api/v1/employees/me",
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-
-    assert response.status_code == 403
-    assert response.json() == {
-        "detail": "Employee access required",
-    }                  

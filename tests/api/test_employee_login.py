@@ -24,10 +24,12 @@ def create_employee_login_test_data(db_session):
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Login Branch",
         slug="login-branch",
     )
+
     db_session.add(branch)
     db_session.flush()
 
@@ -36,6 +38,7 @@ def create_employee_login_test_data(db_session):
         name="Login Department",
         slug="login-department",
     )
+
     db_session.add(department)
     db_session.flush()
 
@@ -46,10 +49,12 @@ def create_employee_login_test_data(db_session):
         full_name="Employee Login User",
         is_active=True,
     )
+
     db_session.add(user)
     db_session.flush()
 
     employee = Employee(
+        organization_id=organization.id,
         user_id=user.id,
         employee_id="EMP-LOGIN-001",
         branch_id=branch.id,
@@ -57,6 +62,7 @@ def create_employee_login_test_data(db_session):
         job_title="Backend Developer",
         is_active=True,
     )
+
     db_session.add(employee)
     db_session.commit()
 

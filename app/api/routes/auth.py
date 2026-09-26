@@ -236,7 +236,7 @@ async def admin_login(
             user_roles.c.user_id == db_user.id,
             Role.organization_id == db_user.organization_id,
             Role.is_active.is_(True),
-            Permission.name == "USER_CREATE",
+            Permission.name == "ADMIN_ACCESS",
             Permission.is_active.is_(True),
         )
     )

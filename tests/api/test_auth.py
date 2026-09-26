@@ -237,10 +237,11 @@ def test_admin_login_returns_admin_token(client, db_session):
     db_session.flush()
 
     permission = Permission(
-        name="USER_CREATE",
-        description="Create users",
+        name="ADMIN_ACCESS",
+        description="Access administrative portal",
         is_active=True,
     )
+
     db_session.add(permission)
     db_session.flush()
 

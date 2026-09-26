@@ -32,10 +32,12 @@ def test_create_team_allows_current_organization(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
-        slug="team-create-branch",
+        slug="team-branch",
     )
+
     db_session.add(branch)
     db_session.flush()
 
@@ -152,6 +154,7 @@ def test_create_team_rejects_another_organization(
     db_session.flush()
 
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
@@ -258,6 +261,7 @@ def test_get_team_allows_current_organization(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
         slug="team-get-branch",
@@ -373,10 +377,12 @@ def test_get_team_rejects_another_organization(
     db_session.flush()
 
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
+
     db_session.add(branch_b)
     db_session.flush()
 
@@ -477,10 +483,12 @@ def test_list_teams_allows_current_organization(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
-        slug="team-list-branch",
+        slug="...",
     )
+
     db_session.add(branch)
     db_session.flush()
 
@@ -600,10 +608,12 @@ def test_list_teams_rejects_another_organization(
     db_session.flush()
 
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
+
     db_session.add(branch_b)
     db_session.flush()
 
@@ -702,10 +712,12 @@ def test_update_team_allows_current_organization(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
         slug="team-update-branch",
     )
+
     db_session.add(branch)
     db_session.flush()
 
@@ -826,10 +838,12 @@ def test_update_team_rejects_another_organization(
     db_session.flush()
 
     branch_b = Branch(
+        organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
+
     db_session.add(branch_b)
     db_session.flush()
 
@@ -936,6 +950,7 @@ def test_update_team_rejects_duplicate_slug(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
         slug="team-update-duplicate-branch",
@@ -1052,10 +1067,12 @@ def test_create_team_rejects_without_permission(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
         slug="team-create-no-permission-branch",
     )
+
     db_session.add(branch)
     db_session.flush()
 
@@ -1128,6 +1145,7 @@ def test_update_team_rejects_without_permission(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
         slug="team-update-no-permission-branch",
@@ -1199,6 +1217,7 @@ def test_list_teams_rejects_without_permission(
         name="Current Organization",
         slug="team-list-no-permission",
     )
+
     db_session.add(organization)
     db_session.flush()
 
@@ -1211,6 +1230,7 @@ def test_list_teams_rejects_without_permission(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
         slug="team-list-no-permission-branch",
@@ -1283,10 +1303,12 @@ def test_update_team_can_deactivate_team(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
         slug="team-deactivate-branch",
     )
+
     db_session.add(branch)
     db_session.flush()
 
@@ -1392,6 +1414,7 @@ def test_get_team_rejects_without_permission(
     db_session.flush()
 
     branch = Branch(
+        organization_id=organization.id,
         region_id=region.id,
         name="Current Organization Branch",
         slug="team-get-no-permission-branch",
