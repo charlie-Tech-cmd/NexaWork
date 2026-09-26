@@ -766,4 +766,315 @@ def test_remove_permission_from_role_allows_with_update_permission(
         )
     ).first()
 
-    assert assignment is None                        
+    assert assignment is None
+
+def test_assign_permission_to_role_rejects_user_without_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Role Assign Reject Organization",
+        slug="role-assign-reject-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Role",
+        description="Employee role",
+        is_active=True,
+    )
+
+    permission = Permission(
+        name="TEST_ASSIGN_PERMISSION",
+        description="Test permission",
+        is_active=True,
+    )
+
+    user = User(
+        organization_id=organization.id,
+        email="role.assign.reject@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Role Assign Reject User",
+        is_active=True,
+    )
+
+    db_session.add_all([role, permission, user])
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "role.assign.reject@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    token = login_response.json()["access_token"]
+
+    response = client.post(
+        f"/api/v1/roles/{role.id}/permissions/{permission.id}",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Permission denied",
+    }
+
+def test_assign_permission_to_role_allows_user_with_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Role Assign Allowed Organization",
+        slug="role-assign-allowed-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    permission = Permission(
+        name="TEST_ASSIGN_PERMISSION",
+        description="Test permission",
+        is_active=True,
+    )
+
+    assign_permission = Permission(
+        name="ROLE_ASSIGN_PERMISSION",
+        description="Assign permissions",
+        is_active=True,
+    )
+
+    manager_role = Role(
+        organization_id=organization.id,
+        name="Permission Manager",
+        description="Can assign permissions",
+        is_active=True,
+    )
+
+    target_role = Role(
+        organization_id=organization.id,
+        name="Employee Role",
+        description="Employee role",
+        is_active=True,
+    )
+
+    user = User(
+        organization_id=organization.id,
+        email="role.assign.allowed@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Role Assign Allowed User",
+        is_active=True,
+    )
+
+    db_session.add_all(
+        [
+            permission,
+            assign_permission,
+            manager_role,
+            target_role,
+            user,
+        ]
+    )
+
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=manager_role.id,
+            permission_id=assign_permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=manager_role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "role.assign.allowed@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    token = login_response.json()["access_token"]
+
+    response = client.post(
+        f"/api/v1/roles/{target_role.id}/permissions/{permission.id}",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 204
+
+def test_remove_permission_from_role_rejects_user_without_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Role Remove Reject Organization",
+        slug="role-remove-reject-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    permission = Permission(
+        name="TEST_REMOVE_PERMISSION",
+        description="Test permission",
+        is_active=True,
+    )
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Role",
+        description="Employee role",
+        is_active=True,
+    )
+
+    user = User(
+        organization_id=organization.id,
+        email="role.remove.reject@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Role Remove Reject User",
+        is_active=True,
+    )
+
+    db_session.add_all([permission, role, user])
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "role.remove.reject@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    token = login_response.json()["access_token"]
+
+    response = client.delete(
+        f"/api/v1/roles/{role.id}/permissions/{permission.id}",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 403
+
+def test_remove_permission_from_role_allows_user_with_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Role Remove Allowed Organization",
+        slug="role-remove-allowed-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    permission = Permission(
+        name="TEST_REMOVE_PERMISSION",
+        description="Test permission",
+        is_active=True,
+    )
+
+    remove_permission = Permission(
+        name="ROLE_REMOVE_PERMISSION",
+        description="Remove permissions",
+        is_active=True,
+    )
+
+    manager_role = Role(
+        organization_id=organization.id,
+        name="Permission Manager",
+        description="Can remove permissions",
+        is_active=True,
+    )
+
+    target_role = Role(
+        organization_id=organization.id,
+        name="Employee Role",
+        description="Employee role",
+        is_active=True,
+    )
+
+    user = User(
+        organization_id=organization.id,
+        email="role.remove.allowed@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Role Remove Allowed User",
+        is_active=True,
+    )
+
+    db_session.add_all(
+        [
+            permission,
+            remove_permission,
+            manager_role,
+            target_role,
+            user,
+        ]
+    )
+
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=manager_role.id,
+            permission_id=remove_permission.id,
+        )
+    )
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=target_role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=manager_role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "role.remove.allowed@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    token = login_response.json()["access_token"]
+
+    response = client.delete(
+        f"/api/v1/roles/{target_role.id}/permissions/{permission.id}",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 204                                        
