@@ -44,6 +44,9 @@ async def create_team(
         .join(Region, Branch.region_id == Region.id)
         .where(
             Department.id == department_id,
+            Department.is_active.is_(True),
+            Branch.is_active.is_(True),
+            Region.is_active.is_(True),
             Region.organization_id == current_organization.id,
         )
     )
@@ -99,6 +102,9 @@ async def list_teams(
         .join(Region, Branch.region_id == Region.id)
         .where(
             Department.id == department_id,
+            Department.is_active.is_(True),
+            Branch.is_active.is_(True),
+            Region.is_active.is_(True),
             Region.organization_id == current_organization.id,
         )
     )
@@ -137,6 +143,9 @@ async def update_team(
         .join(Region, Branch.region_id == Region.id)
         .where(
             Team.id == team_id,
+            Department.is_active.is_(True),
+            Branch.is_active.is_(True),
+            Region.is_active.is_(True),
             Region.organization_id == current_organization.id,
         )
     )
@@ -188,6 +197,9 @@ async def get_team(
         .join(Region, Branch.region_id == Region.id)
         .where(
             Team.id == team_id,
+            Department.is_active.is_(True),
+            Branch.is_active.is_(True),
+            Region.is_active.is_(True),
             Region.organization_id == current_organization.id,
         )
     )

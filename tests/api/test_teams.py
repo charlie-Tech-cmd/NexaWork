@@ -1,3 +1,5 @@
+import pytest
+
 from app.core.security.password import hash_password
 from sqlalchemy import select
 from app.models.branch import Branch
@@ -1466,3 +1468,120 @@ def test_get_team_rejects_without_permission(
 
     assert response.status_code == 403
     assert response.json() == {"detail": "Permission denied"}
+
+
+@pytest.mark.parametrize(
+    "inactive_level",
+    ["region", "branch", "department"],
+)
+def test_team_access_rejects_inactive_hierarchy(
+    client,
+    db_session,
+    inactive_level,
+):
+    organization = Organization(
+        name="Inactive Hierarchy Organization",
+        slug=f"team-inactive-{inactive_level}",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Hierarchy Region",
+        slug=f"team-inactive-{inactive_level}-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Hierarchy Branch",
+        slug=f"team-inactive-{inactive_level}-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Hierarchy Department",
+        slug=f"team-inactive-{inactive_level}-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    team = Team(
+        department_id=department.id,
+        name="Inactive Hierarchy Team",
+        slug=f"team-inactive-{inactive_level}",
+    )
+    db_session.add(team)
+
+    user = User(
+        organization_id=organization.id,
+        email=f"team.inactive.{inactive_level}@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Hierarchy User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = Permission(
+        name="TEAM_VIEW",
+        description="View teams",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Team Viewer",
+        description="Can view teams",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    if inactive_level == "region":
+        region.is_active = False
+    elif inactive_level == "branch":
+        branch.is_active = False
+    else:
+        department.is_active = False
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": f"team.inactive.{inactive_level}@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/teams/{team.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Team not found"}
