@@ -1,23 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from app.api.dependencies import get_current_user
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import get_current_user
 from app.core.security.password import hash_password, verify_password
 from app.core.security.jwt import create_access_token
 from app.core.rate_limit import is_login_allowed
 from app.db.session import get_db
 from app.models.employee import Employee
-from app.models.user import User
-from app.schemas.employee import EmployeeLogin
-from app.schemas.user import UserCreate, UserLogin, UserResponse
-
+from app.models.organization import Organization
 from app.models.permission import Permission
 from app.models.role import Role
 from app.models.role_permission import role_permissions
+from app.models.user import User
 from app.models.user_role import user_roles
+from app.schemas.employee import EmployeeLogin
 from app.schemas.user import AdminLogin
+from app.schemas.user import UserCreate, UserLogin, UserResponse
+
 
 router = APIRouter(prefix="/api/v1")
 
@@ -216,6 +217,19 @@ async def admin_login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
+        )
+
+    organization = db.scalar(
+        select(Organization).where(
+            Organization.id == db_user.organization_id,
+            Organization.is_active.is_(True),
+        )
+    )
+
+    if organization is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization is inactive or unavailable",
         )
 
     admin_role_exists = db.scalar(
