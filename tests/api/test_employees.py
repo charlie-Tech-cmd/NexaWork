@@ -939,4 +939,146 @@ def test_update_employee_rejects_another_organization_department(
     db_session.refresh(employee_a)
 
     assert employee_a.branch_id == branch_a.id
-    assert employee_a.department_id == department_a.id    
+    assert employee_a.department_id == department_a.id
+
+
+def test_list_department_employees_excludes_employee_from_another_organization(
+    client,
+    db_session,
+):
+    organization_a = Organization(
+        name="Organization A",
+        slug="employee-list-direct-a",
+    )
+    organization_b = Organization(
+        name="Organization B",
+        slug="employee-list-direct-b",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    region_a = Region(
+        organization_id=organization_a.id,
+        name="Organization A Region",
+        slug="employee-list-direct-region-a",
+    )
+    region_b = Region(
+        organization_id=organization_b.id,
+        name="Organization B Region",
+        slug="employee-list-direct-region-b",
+    )
+    db_session.add_all([region_a, region_b])
+    db_session.flush()
+
+    branch_a = Branch(
+        organization_id=organization_a.id,
+        region_id=region_a.id,
+        name="Organization A Branch",
+        slug="employee-list-direct-branch-a",
+    )
+    branch_b = Branch(
+        organization_id=organization_b.id,
+        region_id=region_b.id,
+        name="Organization B Branch",
+        slug="employee-list-direct-branch-b",
+    )
+    db_session.add_all([branch_a, branch_b])
+    db_session.flush()
+
+    department_a = Department(
+        branch_id=branch_a.id,
+        name="Organization A Department",
+        slug="employee-list-direct-department-a",
+    )
+    db_session.add(department_a)
+    db_session.flush()
+
+    user_a = User(
+        organization_id=organization_a.id,
+        email="employee.list.direct.a@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization A User",
+        is_active=True,
+    )
+    user_b = User(
+        organization_id=organization_b.id,
+        email="employee.list.direct.b@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization B User",
+        is_active=True,
+    )
+    db_session.add_all([user_a, user_b])
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_VIEW",
+        description="View employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization_a.id,
+        name="Employee Viewer",
+        description="Can view employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user_a.id,
+            role_id=role.id,
+        )
+    )
+
+    employee_a = Employee(
+        organization_id=organization_a.id,
+        user_id=user_a.id,
+        employee_id="EMP-LIST-DIRECT-A",
+        branch_id=branch_a.id,
+        department_id=department_a.id,
+        job_title="Developer",
+    )
+
+    employee_b = Employee(
+        organization_id=organization_b.id,
+        user_id=user_b.id,
+        employee_id="EMP-LIST-DIRECT-B",
+        branch_id=branch_a.id,
+        department_id=department_a.id,
+        job_title="Developer",
+    )
+
+    db_session.add_all([employee_a, employee_b])
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "employee.list.direct.a@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/employees/departments/{department_a.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+
+    assert [employee["id"] for employee in response_data] == [employee_a.id]

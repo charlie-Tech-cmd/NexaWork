@@ -133,6 +133,7 @@ async def get_employee(
         .where(
             Employee.id == employee_id,
             Region.organization_id == current_organization.id,
+            Employee.organization_id == current_organization.id,
         )
     )
 
@@ -173,7 +174,8 @@ async def list_department_employees(
     employees = db.scalars(
         select(Employee)
         .where(
-            Employee.department_id == department_id
+            Employee.department_id == department_id,
+            Employee.organization_id == current_organization.id,
         )
         .order_by(Employee.id)
     ).all()
@@ -198,6 +200,7 @@ async def update_employee(
         .where(
             Employee.id == employee_id,
             Region.organization_id == current_organization.id,
+            Employee.organization_id == current_organization.id,
         )
     )
 
