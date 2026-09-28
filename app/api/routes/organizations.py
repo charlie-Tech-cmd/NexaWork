@@ -3,7 +3,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_organization, get_current_user
+
+from app.api.dependencies import (
+    get_current_organization,
+    get_current_user,
+    require_permission,
+)
+
 from app.core.security.password import hash_password
 from app.db.session import get_db
 from app.models.organization import Organization
@@ -17,6 +23,7 @@ from app.schemas.organization import (
     OrganizationOnboardingCreate,
     OrganizationOnboardingResponse,
     OrganizationResponse,
+    OrganizationUpdate,
 )
 
 
@@ -92,13 +99,14 @@ async def onboard_organization(
                     "USER_CREATE",
                     "USER_UPDATE",
                     "USER_DELETE",
+                    "ORGANIZATION_UPDATE",
                 ]
             ),
             Permission.is_active.is_(True),
         )
     ).all()
 
-    if len(permissions) != 4:
+    if len(permissions) != 5:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -167,6 +175,48 @@ async def create_organization(
     db.refresh(new_organization)
 
     return new_organization
+
+
+@router.get(
+    "/me",
+    response_model=OrganizationResponse,
+)
+async def get_my_organization(
+    current_organization: Organization = Depends(get_current_organization),
+):
+    return current_organization
+
+
+@router.patch(
+    "/me",
+    response_model=OrganizationResponse,
+)
+async def update_my_organization(
+    organization_update: OrganizationUpdate,
+    current_organization: Organization = Depends(get_current_organization),
+    current_user: User = Depends(
+        require_permission("ORGANIZATION_UPDATE")
+    ),
+    db: Session = Depends(get_db),
+):
+    if organization_update.name is not None:
+        current_organization.name = organization_update.name
+
+    if organization_update.slug is not None:
+        current_organization.slug = organization_update.slug
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Organization slug already exists",
+        )
+
+    db.refresh(current_organization)
+
+    return current_organization
 
 
 @router.get(

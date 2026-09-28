@@ -10,6 +10,17 @@ class OrganizationCreate(BaseModel):
     slug: str = Field(min_length=2, max_length=100)
 
 
+class OrganizationUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=255)
+    slug: str | None = Field(default=None, min_length=2, max_length=100)
+
+    @model_validator(mode="after")
+    def at_least_one_field(self):
+        if self.name is None and self.slug is None:
+            raise ValueError("At least one field must be provided")
+        return self
+
+
 class OrganizationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
