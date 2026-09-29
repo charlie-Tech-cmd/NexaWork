@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -9,11 +9,28 @@ from app.db.base import Base
 class User(Base):
     __tablename__ = "users"
 
+    __table_args__ = (
+        CheckConstraint(
+            """
+            (
+                is_super_admin = FALSE
+                AND organization_id IS NOT NULL
+            )
+            OR
+            (
+                is_super_admin = TRUE
+                AND organization_id IS NULL
+            )
+            """,
+            name="ck_users_super_admin_organization",
+        ),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    organization_id: Mapped[int] = mapped_column(
+    organization_id: Mapped[int | None] = mapped_column(
         ForeignKey("organizations.id"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
@@ -34,6 +51,11 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
+        nullable=False,
+    )
+    is_super_admin: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
         nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
