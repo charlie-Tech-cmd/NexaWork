@@ -61,6 +61,10 @@ async def create_employee(
         .where(
             Branch.id == employee.branch_id,
             Region.organization_id == current_organization.id,
+            Region.is_active.is_(True),
+            Branch.is_active.is_(True),
+
+
         )
     )
 
@@ -74,6 +78,8 @@ async def create_employee(
         select(Department).where(
             Department.id == employee.department_id,
             Department.branch_id == branch.id,
+            Department.is_active.is_(True),
+
         )
     )
 
@@ -84,6 +90,7 @@ async def create_employee(
         )
 
     new_employee = Employee(
+        organization_id=current_organization.id,
         user_id=employee.user_id,
         employee_id=employee.employee_id,
         branch_id=employee.branch_id,
@@ -132,8 +139,10 @@ async def get_employee(
         .join(Region, Region.id == Branch.region_id)
         .where(
             Employee.id == employee_id,
-            Region.organization_id == current_organization.id,
             Employee.organization_id == current_organization.id,
+            Region.organization_id == current_organization.id,
+            Region.is_active.is_(True),
+            Branch.is_active.is_(True),
         )
     )
 
@@ -161,6 +170,9 @@ async def list_department_employees(
         .join(Region, Region.id == Branch.region_id)
         .where(
             Department.id == department_id,
+            Department.is_active.is_(True),
+            Branch.is_active.is_(True),
+            Region.is_active.is_(True),
             Region.organization_id == current_organization.id,
         )
     )

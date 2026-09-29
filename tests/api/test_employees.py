@@ -1,3 +1,5 @@
+import pytest
+
 from app.core.security.password import hash_password
 from app.models.branch import Branch
 from app.models.department import Department
@@ -128,6 +130,566 @@ def test_get_employee_rejects_another_organization(
 
     response = client.get(
         f"/api/v1/employees/{employee_b.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Employee not found"}
+
+
+def test_create_employee_assigns_current_organization(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Employee Create Organization",
+        slug="employee-create-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Employee Create Region",
+        slug="employee-create-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Employee Create Branch",
+        slug="employee-create-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Employee Create Department",
+        slug="employee-create-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="employee.create.success@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Employee Create User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_CREATE",
+        description="Create employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Creator",
+        description="Can create employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "employee.create.success@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/api/v1/employees",
+        json={
+            "user_id": user.id,
+            "employee_id": "EMP-CREATE-001",
+            "branch_id": branch.id,
+            "department_id": department.id,
+            "job_title": "Developer",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 201
+
+    created_employee = db_session.scalar(
+        select(Employee).where(
+            Employee.employee_id == "EMP-CREATE-001"
+        )
+    )
+
+    assert created_employee is not None
+    assert created_employee.organization_id == organization.id
+    assert created_employee.user_id == user.id
+    assert created_employee.branch_id == branch.id
+    assert created_employee.department_id == department.id
+
+
+def test_create_employee_rejects_inactive_region(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Region Organization",
+        slug="inactive-region-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Region",
+        slug="inactive-region",
+        is_active=False,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Region Branch",
+        slug="inactive-region-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Region Department",
+        slug="inactive-region-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.region.employee@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Region Employee",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_CREATE",
+        description="Create employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Creator",
+        description="Can create employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.region.employee@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/api/v1/employees",
+        json={
+            "user_id": user.id,
+            "employee_id": "EMP-INACTIVE-REGION-001",
+            "branch_id": branch.id,
+            "department_id": department.id,
+            "job_title": "Developer",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Branch not found"}
+
+
+def test_create_employee_rejects_inactive_branch(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Branch Organization",
+        slug="inactive-branch-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Branch Region",
+        slug="inactive-branch-region",
+        is_active=True,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Branch",
+        slug="inactive-branch",
+        is_active=False,
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Branch Department",
+        slug="inactive-branch-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.branch.employee@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Branch Employee",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_CREATE",
+        description="Create employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Creator",
+        description="Can create employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.branch.employee@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/api/v1/employees",
+        json={
+            "user_id": user.id,
+            "employee_id": "EMP-INACTIVE-BRANCH-001",
+            "branch_id": branch.id,
+            "department_id": department.id,
+            "job_title": "Developer",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Branch not found"}
+
+
+def test_create_employee_rejects_inactive_department(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Department Organization",
+        slug="inactive-department-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Department Region",
+        slug="inactive-department-region",
+        is_active=True,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Department Branch",
+        slug="inactive-department-branch",
+        is_active=True,
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Department",
+        slug="inactive-department",
+        is_active=False,
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.department.employee@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Department Employee",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_CREATE",
+        description="Create employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Creator",
+        description="Can create employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.department.employee@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/api/v1/employees",
+        json={
+            "user_id": user.id,
+            "employee_id": "EMP-INACTIVE-DEPARTMENT-001",
+            "branch_id": branch.id,
+            "department_id": department.id,
+            "job_title": "Developer",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Department not found"}
+
+
+@pytest.mark.parametrize(
+    "inactive_level",
+    ["region", "branch"],
+)
+def test_get_employee_rejects_inactive_hierarchy(
+    client,
+    db_session,
+    inactive_level,
+):
+    organization = Organization(
+        name="Inactive Hierarchy Organization",
+        slug=f"employee-inactive-{inactive_level}",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Hierarchy Region",
+        slug=f"employee-inactive-region-{inactive_level}",
+        is_active=True,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Hierarchy Branch",
+        slug=f"employee-inactive-branch-{inactive_level}",
+        is_active=True,
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Hierarchy Department",
+        slug=f"employee-inactive-department-{inactive_level}",
+        is_active=True,
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email=f"employee.inactive.{inactive_level}@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Hierarchy User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_VIEW",
+        description="View employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Viewer",
+        description="Can view employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id=f"EMP-INACTIVE-{inactive_level.upper()}",
+        branch_id=branch.id,
+        department_id=department.id,
+        job_title="Developer",
+    )
+    db_session.add(employee)
+    db_session.flush()
+
+    if inactive_level == "region":
+        region.is_active = False
+    else:
+        branch.is_active = False
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": f"employee.inactive.{inactive_level}@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/employees/{employee.id}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -1082,3 +1644,128 @@ def test_list_department_employees_excludes_employee_from_another_organization(
     response_data = response.json()
 
     assert [employee["id"] for employee in response_data] == [employee_a.id]
+
+
+@pytest.mark.parametrize(
+    "inactive_level",
+    ["region", "branch", "department"],
+)
+def test_list_department_employees_rejects_inactive_hierarchy(
+    client,
+    db_session,
+    inactive_level,
+):
+    organization = Organization(
+        name="Inactive List Hierarchy Organization",
+        slug=f"employee-list-inactive-{inactive_level}",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive List Region",
+        slug=f"employee-list-inactive-region-{inactive_level}",
+        is_active=True,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive List Branch",
+        slug=f"employee-list-inactive-branch-{inactive_level}",
+        is_active=True,
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive List Department",
+        slug=f"employee-list-inactive-department-{inactive_level}",
+        is_active=True,
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email=f"employee.list.inactive.{inactive_level}@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive List Hierarchy User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_VIEW",
+        description="View employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Viewer",
+        description="Can view employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id=f"EMP-LIST-INACTIVE-{inactive_level.upper()}",
+        branch_id=branch.id,
+        department_id=department.id,
+        job_title="Developer",
+    )
+    db_session.add(employee)
+    db_session.flush()
+
+    if inactive_level == "region":
+        region.is_active = False
+    elif inactive_level == "branch":
+        branch.is_active = False
+    else:
+        department.is_active = False
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": f"employee.list.inactive.{inactive_level}@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/employees/departments/{department.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Department not found"}
