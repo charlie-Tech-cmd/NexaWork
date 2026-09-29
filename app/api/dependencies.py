@@ -43,6 +43,19 @@ def get_current_user(
             detail="User not found",
         )
 
+    organization = db.scalar(
+        select(Organization).where(
+            Organization.id == db_user.organization_id,
+            Organization.is_active.is_(True),
+        )
+    )
+
+    if organization is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization is inactive or unavailable",
+        )
+
     return db_user
 
 def get_current_admin(

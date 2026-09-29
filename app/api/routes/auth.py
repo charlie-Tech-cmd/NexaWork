@@ -97,6 +97,19 @@ async def login_user(
             detail="User account is inactive",
         )
 
+    organization = db.scalar(
+        select(Organization).where(
+            Organization.id == db_user.organization_id,
+            Organization.is_active.is_(True),
+        )
+    )
+
+    if organization is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization is inactive or unavailable",
+        )
+
     access_token = create_access_token(str(db_user.id))
 
     return {
@@ -160,6 +173,19 @@ async def employee_login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid employee ID or password",
+        )
+
+    organization = db.scalar(
+        select(Organization).where(
+            Organization.id == db_user.organization_id,
+            Organization.is_active.is_(True),
+        )
+    )
+
+    if organization is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization is inactive or unavailable",
         )
 
     access_token = create_access_token(str(db_user.id))

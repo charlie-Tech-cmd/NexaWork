@@ -11,7 +11,13 @@ from app.models.permission import Permission
 from app.models.role import Role
 from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
+from app.models.branch import Branch
+from app.models.department import Department
+from app.models.employee import Employee
+from app.models.region import Region
+
 from unittest.mock import patch
+
 
 def test_login_returns_access_token(client, db_session):
     organization = Organization(
@@ -391,3 +397,168 @@ def test_admin_login_rejects_rate_limited_request(client):
     assert response.json()["detail"] == (
         "Too many login attempts. Please try again later."
     )
+
+
+def test_login_rejects_inactive_organization(client, db_session):
+    organization = Organization(
+        name="Inactive Login Organization",
+        slug="inactive-login-organization",
+        is_active=False,
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive-org-login@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Organization User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=True,
+    ):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": user.email,
+                "password": "SecurePassword123!",
+            },
+        )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Organization is inactive or unavailable",
+    }
+
+
+def test_employee_login_rejects_inactive_organization(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Employee Organization",
+        slug="inactive-employee-organization",
+        is_active=False,
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Employee Region",
+        slug="inactive-employee-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Employee Branch",
+        slug="inactive-employee-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Employee Department",
+        slug="inactive-employee-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive-org-employee@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Organization Employee",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id="EMP-INACTIVE-ORG",
+        branch_id=branch.id,
+        department_id=department.id,
+        job_title="Developer",
+        is_active=True,
+    )
+    db_session.add(employee)
+    db_session.commit()
+
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=True,
+    ):
+        response = client.post(
+            "/api/v1/auth/employee/login",
+            json={
+                "employee_id": employee.employee_id,
+                "password": "SecurePassword123!",
+            },
+        )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Organization is inactive or unavailable",
+    }
+
+
+def test_auth_me_rejects_token_after_organization_deactivation(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Organization Deactivation Test",
+        slug="organization-deactivation-test",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="organization-deactivation@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization Deactivation User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=True,
+    ):
+        login_response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": user.email,
+                "password": "SecurePassword123!",
+            },
+        )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    organization.is_active = False
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Organization is inactive or unavailable",
+    }
