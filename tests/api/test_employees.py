@@ -697,6 +697,238 @@ def test_get_employee_rejects_inactive_hierarchy(
     assert response.json() == {"detail": "Employee not found"}
 
 
+def test_update_employee_rejects_inactive_region(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Update Region Organization",
+        slug="inactive-update-region-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Update Region",
+        slug="inactive-update-region",
+        is_active=False,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Update Branch",
+        slug="inactive-update-branch",
+        is_active=True,
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Update Department",
+        slug="inactive-update-department",
+        is_active=True,
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.update.region@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Update Region User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id="EMP-INACTIVE-UPDATE-REGION-001",
+        branch_id=branch.id,
+        department_id=department.id,
+        job_title="Developer",
+        is_active=True,
+    )
+    db_session.add(employee)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_UPDATE",
+        description="Update employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Updater",
+        description="Can update employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.update.region@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/api/v1/employees/{employee.id}",
+        json={
+            "job_title": "Senior Developer",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Employee not found"}
+
+
+def test_update_employee_rejects_inactive_department(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Update Department Organization",
+        slug="inactive-update-department-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Update Department Region",
+        slug="inactive-update-department-region",
+        is_active=True,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Update Department Branch",
+        slug="inactive-update-department-branch",
+        is_active=True,
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Update Department",
+        slug="inactive-update-department",
+        is_active=False,
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.update.department@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Update Department User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id="EMP-INACTIVE-UPDATE-DEPT-001",
+        branch_id=branch.id,
+        department_id=department.id,
+        job_title="Developer",
+        is_active=True,
+    )
+    db_session.add(employee)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_UPDATE",
+        description="Update employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Updater",
+        description="Can update employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.update.department@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/api/v1/employees/{employee.id}",
+        json={
+            "job_title": "Senior Developer",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Employee not found"}
+
+
 def test_get_employee_allows_current_organization(
     client,
     db_session,
@@ -1764,6 +1996,388 @@ def test_list_department_employees_rejects_inactive_hierarchy(
 
     response = client.get(
         f"/api/v1/employees/departments/{department.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Department not found"}
+
+
+def test_update_employee_rejects_inactive_target_branch(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Target Branch Organization",
+        slug="inactive-target-branch-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Target Branch Region",
+        slug="inactive-target-branch-region",
+        is_active=True,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    current_branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Current Branch",
+        slug="current-branch",
+        is_active=True,
+    )
+    target_branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Target Branch",
+        slug="inactive-target-branch",
+        is_active=False,
+    )
+    db_session.add_all([current_branch, target_branch])
+    db_session.flush()
+
+    department = Department(
+        branch_id=current_branch.id,
+        name="Current Department",
+        slug="current-department",
+        is_active=True,
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.target.branch@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Target Branch User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id="EMP-INACTIVE-TARGET-BRANCH-001",
+        branch_id=current_branch.id,
+        department_id=department.id,
+        job_title="Developer",
+        is_active=True,
+    )
+    db_session.add(employee)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_UPDATE",
+        description="Update employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Updater",
+        description="Can update employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.target.branch@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/api/v1/employees/{employee.id}",
+        json={
+            "branch_id": target_branch.id,
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Branch not found"}
+
+
+def test_update_employee_rejects_target_department_under_inactive_branch(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Department Branch Organization",
+        slug="inactive-department-branch-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Department Branch Region",
+        slug="inactive-department-branch-region",
+        is_active=True,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    current_branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Current Branch",
+        slug="current-department-current-branch",
+        is_active=True,
+    )
+    target_branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Department Target Branch",
+        slug="inactive-department-target-branch",
+        is_active=False,
+    )
+    db_session.add_all([current_branch, target_branch])
+    db_session.flush()
+
+    current_department = Department(
+        branch_id=current_branch.id,
+        name="Current Department",
+        slug="inactive-department-current-department",
+        is_active=True,
+    )
+    target_department = Department(
+        branch_id=target_branch.id,
+        name="Target Department",
+        slug="inactive-department-target-department",
+        is_active=True,
+    )
+    db_session.add_all([current_department, target_department])
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.department.branch@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Department Branch User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id="EMP-INACTIVE-DEPT-BRANCH-001",
+        branch_id=current_branch.id,
+        department_id=current_department.id,
+        job_title="Developer",
+        is_active=True,
+    )
+    db_session.add(employee)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_UPDATE",
+        description="Update employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Updater",
+        description="Can update employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.department.branch@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/api/v1/employees/{employee.id}",
+        json={
+            "department_id": target_department.id,
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Department not found"}
+
+
+def test_update_employee_rejects_inactive_target_department(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Target Department Organization",
+        slug="inactive-target-department-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Target Department Region",
+        slug="inactive-target-department-region",
+        is_active=True,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    current_branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Current Branch",
+        slug="inactive-target-department-current-branch",
+        is_active=True,
+    )
+    target_branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Target Branch",
+        slug="inactive-target-department-target-branch",
+        is_active=True,
+    )
+    db_session.add_all([current_branch, target_branch])
+    db_session.flush()
+
+    current_department = Department(
+        branch_id=current_branch.id,
+        name="Current Department",
+        slug="inactive-target-department-current-department",
+        is_active=True,
+    )
+    target_department = Department(
+        branch_id=target_branch.id,
+        name="Inactive Target Department",
+        slug="inactive-target-department-target-department",
+        is_active=False,
+    )
+    db_session.add_all([current_department, target_department])
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.target.department@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Target Department User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id="EMP-INACTIVE-TARGET-DEPT-001",
+        branch_id=current_branch.id,
+        department_id=current_department.id,
+        job_title="Developer",
+        is_active=True,
+    )
+    db_session.add(employee)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_UPDATE",
+        description="Update employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Updater",
+        description="Can update employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.target.department@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/api/v1/employees/{employee.id}",
+        json={
+            "branch_id": target_branch.id,
+            "department_id": target_department.id,
+        },
         headers={"Authorization": f"Bearer {access_token}"},
     )
 

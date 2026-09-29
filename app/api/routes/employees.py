@@ -213,10 +213,25 @@ async def update_employee(
             Employee.id == employee_id,
             Region.organization_id == current_organization.id,
             Employee.organization_id == current_organization.id,
+            Region.is_active.is_(True),
+            Branch.is_active.is_(True),
         )
     )
 
     if employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found",
+        )
+
+    department = db.scalar(
+        select(Department).where(
+            Department.id == employee.department_id,
+            Department.is_active.is_(True),
+        )
+    )
+
+    if department is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Employee not found",
@@ -229,6 +244,8 @@ async def update_employee(
             .where(
                 Branch.id == employee_data.branch_id,
                 Region.organization_id == current_organization.id,
+                Region.is_active.is_(True),
+                Branch.is_active.is_(True),
             )
         )
 
@@ -251,6 +268,7 @@ async def update_employee(
             select(Department).where(
                 Department.id == employee_data.department_id,
                 Department.branch_id == target_branch_id,
+                Department.is_active.is_(True),
             )
         )
 
