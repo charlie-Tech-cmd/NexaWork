@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import (
     get_current_organization,
+    get_current_super_admin,
     get_current_user,
     require_permission,
 )
@@ -153,7 +154,7 @@ async def onboard_organization(
 )
 async def create_organization(
     organization: OrganizationCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_super_admin),
     db: Session = Depends(get_db),
 ):
     new_organization = Organization(

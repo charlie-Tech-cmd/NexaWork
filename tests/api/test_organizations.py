@@ -444,6 +444,113 @@ def test_update_my_organization_rejects_duplicate_slug(
     assert organization.slug == "primary-organization"
 
 
+def test_create_organization_requires_super_admin(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Existing Organization",
+        slug="existing-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="regular.user@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Regular User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "regular.user@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/api/v1/organizations",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={
+            "name": "Unauthorized Organization",
+            "slug": "unauthorized-organization",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Super Admin authentication required",
+    }
+
+    created_organization = db_session.scalar(
+        select(Organization).where(
+            Organization.slug == "unauthorized-organization",
+        )
+    )
+    assert created_organization is None
+
+
+def test_create_organization_allows_super_admin(
+    client,
+    db_session,
+):
+    super_admin = User(
+        organization_id=None,
+        email="super.admin@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Super Admin",
+        is_active=True,
+        is_super_admin=True,
+    )
+    db_session.add(super_admin)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": "super.admin@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        "/api/v1/organizations",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={
+            "name": "Super Admin Organization",
+            "slug": "super-admin-organization",
+        },
+    )
+
+    assert response.status_code == 201
+
+    response_data = response.json()
+
+    assert response_data["name"] == "Super Admin Organization"
+    assert response_data["slug"] == "super-admin-organization"
+    assert response_data["is_active"] is True
+
+    created_organization = db_session.scalar(
+        select(Organization).where(
+            Organization.slug == "super-admin-organization",
+        )
+    )
+    assert created_organization is not None
+    assert created_organization.name == "Super Admin Organization"
+
 def test_organization_onboarding_grants_organization_update_permission(
     client,
     db_session,
