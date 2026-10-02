@@ -40,7 +40,9 @@ async def create_department(
         .join(Region, Branch.region_id == Region.id)
         .where(
             Branch.id == branch_id,
+            Branch.is_active.is_(True),
             Region.organization_id == current_organization.id,
+            Region.is_active.is_(True),
         )
     )
 
@@ -88,6 +90,8 @@ async def get_department(
         .where(
             Department.id == department_id,
             Region.organization_id == current_organization.id,
+            Region.is_active.is_(True),
+            Branch.is_active.is_(True),
         )
     )
 
@@ -114,7 +118,9 @@ async def list_departments(
         .join(Region, Branch.region_id == Region.id)
         .where(
             Branch.id == branch_id,
+            Branch.is_active.is_(True),
             Region.organization_id == current_organization.id,
+            Region.is_active.is_(True),
         )
     )
 
@@ -150,6 +156,8 @@ async def update_department(
         .where(
             Department.id == department_id,
             Region.organization_id == current_organization.id,
+            Region.is_active.is_(True),
+            Branch.is_active.is_(True),
         )
     )
 

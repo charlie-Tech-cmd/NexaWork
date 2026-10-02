@@ -286,3 +286,207 @@ def test_create_department_rejects_another_organization(
     )
 
     assert created_department is None
+
+def test_get_department_rejects_inactive_region(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Region Organization",
+        slug="department-inactive-region-org",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Region",
+        slug="department-inactive-region",
+        is_active=False,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Region Branch",
+        slug="department-inactive-region-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Region Department",
+        slug="department-under-inactive-region",
+    )
+    db_session.add(department)
+
+    user = User(
+        organization_id=organization.id,
+        email="department.inactive.region@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Region User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "department.inactive.region@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/departments/{department.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Department not found"}
+
+
+def test_list_departments_rejects_inactive_branch(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Branch Organization",
+        slug="department-inactive-branch-org",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Active Region",
+        slug="department-inactive-branch-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Branch",
+        slug="department-inactive-branch",
+        is_active=False,
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Branch Department",
+        slug="department-under-inactive-branch",
+    )
+    db_session.add(department)
+
+    user = User(
+        organization_id=organization.id,
+        email="department.inactive.branch@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Branch User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "department.inactive.branch@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/departments/branches/{branch.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Branch not found"}
+
+
+def test_create_department_rejects_inactive_branch(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Create Inactive Branch Organization",
+        slug="department-create-inactive-branch-org",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Active Region",
+        slug="department-create-inactive-branch-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Branch",
+        slug="department-create-inactive-branch",
+        is_active=False,
+    )
+    db_session.add(branch)
+
+    user = User(
+        organization_id=organization.id,
+        email="department.create.inactive.branch@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Create Inactive Branch User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "department.create.inactive.branch@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        f"/api/v1/departments/branches/{branch.id}",
+        json={
+            "name": "Blocked Department",
+            "slug": "blocked-department",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Branch not found"}
+
+    created_department = db_session.scalar(
+        select(Department).where(
+            Department.slug == "blocked-department"
+        )
+    )
+
+    assert created_department is None
