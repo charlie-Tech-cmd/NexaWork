@@ -116,6 +116,117 @@ def test_get_region_allows_current_organization(
     assert response_data["updated_at"] is not None
 
 
+def test_get_region_rejects_inactive_region(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Region Organization",
+        slug="inactive-region-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Region",
+        slug="inactive-region",
+        is_active=False,
+    )
+    db_session.add(region)
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.region@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Region User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.region@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/regions/{region.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Region not found"}
+
+
+def test_list_regions_excludes_inactive_region(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Region List Organization",
+        slug="region-list-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    active_region = Region(
+        organization_id=organization.id,
+        name="Active Region",
+        slug="active-region",
+        is_active=True,
+    )
+    inactive_region = Region(
+        organization_id=organization.id,
+        name="Inactive Region",
+        slug="inactive-region",
+        is_active=False,
+    )
+    db_session.add_all([active_region, inactive_region])
+
+    user = User(
+        organization_id=organization.id,
+        email="region.list@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Region List User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "region.list@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/regions/organizations/{organization.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+
+    assert len(response_data) == 1
+    assert response_data[0]["id"] == active_region.id
+    assert response_data[0]["is_active"] is True
+
+
 def test_list_regions_returns_only_current_organization_regions(
     client,
     db_session,

@@ -73,6 +73,7 @@ async def get_region(
         select(Region).where(
             Region.id == region_id,
             Region.organization_id == current_organization.id,
+            Region.is_active.is_(True),
         )
     )
 
@@ -103,7 +104,8 @@ async def list_regions(
     regions = db.scalars(
         select(Region)
         .where(
-            Region.organization_id == current_organization.id
+            Region.organization_id == current_organization.id,
+            Region.is_active.is_(True),
         )
         .order_by(Region.id)
     ).all()
