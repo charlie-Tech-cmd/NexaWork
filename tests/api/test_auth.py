@@ -3,10 +3,14 @@ from datetime import datetime, timedelta, timezone
 import jwt
 
 from app.core.config import settings
-from app.core.security.password import hash_password
+from app.core.security.password import hash_password, verify_password
+from app.core.security.reset_token import hash_reset_token
+from app.core.redis import redis_client
+
+from tests.helpers import create_password_reset_test_user
+from app.models.password_reset_token import PasswordResetToken
 from app.models.organization import Organization
 from app.models.user import User
-
 from app.models.permission import Permission
 from app.models.role import Role
 from app.models.role_permission import role_permissions
@@ -785,3 +789,460 @@ def test_auth_me_rejects_token_after_organization_deactivation(
     assert response.json() == {
         "detail": "Organization is inactive or unavailable",
     }
+
+
+def test_auth_me_rejects_token_after_token_version_changes(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Token Revocation Organization",
+        slug="token-revocation-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="token.revocation@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Token Revocation User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=True,
+    ):
+        login_response = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": user.email,
+                "password": "SecurePassword123!",
+            },
+        )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    valid_response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert valid_response.status_code == 200
+
+    user.token_version += 1
+    db_session.commit()
+
+    revoked_response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert revoked_response.status_code == 401
+    assert revoked_response.json() == {
+        "detail": "Invalid or expired token",
+    }
+
+
+def test_forgot_password_returns_generic_response_for_existing_user(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Forgot Password Organization",
+        slug="forgot-password-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="forgot@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Forgot Password User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/forgot-password",
+        json={
+            "email": "forgot@example.com",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "message": "If an account exists with that email, a password reset link has been sent.",
+    }
+
+
+def test_forgot_password_returns_same_response_for_unknown_email(client):
+    response = client.post(
+        "/api/v1/auth/forgot-password",
+        json={
+            "email": "does-not-exist@example.com",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "message": "If an account exists with that email, a password reset link has been sent.",
+    }
+
+
+def test_reset_password_updates_password(client, db_session):
+    organization = Organization(
+        name="Reset Password API Organization",
+        slug="reset-password-api-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="reset-api@example.com",
+        password_hash=hash_password("OldPassword123!"),
+        full_name="Reset API User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    raw_token = "test-reset-token"
+
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token_hash=hash_reset_token(raw_token),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+    )
+    db_session.add(reset_token)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/reset-password",
+        json={
+            "token": raw_token,
+            "new_password": "NewPassword123!",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "message": "Password reset successful",
+    }
+
+    db_session.refresh(user)
+    db_session.refresh(reset_token)
+
+    assert verify_password(
+        "NewPassword123!",
+        user.password_hash,
+    )
+    assert not verify_password(
+        "OldPassword123!",
+        user.password_hash,
+    )
+    assert user.token_version == 1
+    assert reset_token.used_at is not None
+
+
+def test_reset_password_rejects_invalid_token(client):
+    response = client.post(
+        "/api/v1/auth/reset-password",
+        json={
+            "token": "invalid-reset-token",
+            "new_password": "NewPassword123!",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid or expired password reset token",
+    }
+
+
+def test_reset_password_rejects_expired_token(client, db_session):
+    organization = Organization(
+        name="Expired Reset API Organization",
+        slug="expired-reset-api-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="expired-reset-api@example.com",
+        password_hash=hash_password("OldPassword123!"),
+        full_name="Expired Reset API User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    raw_token = "expired-reset-token"
+
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token_hash=hash_reset_token(raw_token),
+        expires_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+    )
+    db_session.add(reset_token)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/reset-password",
+        json={
+            "token": raw_token,
+            "new_password": "NewPassword123!",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid or expired password reset token",
+    }
+
+
+def test_reset_password_rejects_used_token(client, db_session):
+    organization = Organization(
+        name="Used Reset API Organization",
+        slug="used-reset-api-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="used-reset-api@example.com",
+        password_hash=hash_password("OldPassword123!"),
+        full_name="Used Reset API User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    raw_token = "used-reset-token"
+
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token_hash=hash_reset_token(raw_token),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+        used_at=datetime.now(timezone.utc),
+    )
+    db_session.add(reset_token)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/reset-password",
+        json={
+            "token": raw_token,
+            "new_password": "NewPassword123!",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid or expired password reset token",
+    }
+
+
+def test_reset_password_revokes_existing_access_token(client, db_session):
+    organization = Organization(
+        name="Reset Revocation Organization",
+        slug="reset-revocation-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="reset-revocation@example.com",
+        password_hash=hash_password("OldPassword123!"),
+        full_name="Reset Revocation User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "reset-revocation@example.com",
+            "password": "OldPassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    me_response = client.get(
+        "/api/v1/auth/me",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+        },
+    )
+
+    assert me_response.status_code == 200
+
+    raw_token = "reset-revocation-token"
+
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token_hash=hash_reset_token(raw_token),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+    )
+    db_session.add(reset_token)
+    db_session.commit()
+
+    reset_response = client.post(
+        "/api/v1/auth/reset-password",
+        json={
+            "token": raw_token,
+            "new_password": "NewPassword123!",
+        },
+    )
+
+    assert reset_response.status_code == 200
+
+    revoked_response = client.get(
+        "/api/v1/auth/me",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+        },
+    )
+
+    assert revoked_response.status_code == 401
+    assert revoked_response.json() == {
+        "detail": "Invalid or expired token",
+    }
+
+
+def test_forgot_password_is_rate_limited(client, monkeypatch):
+    monkeypatch.setattr(settings, "rate_limit_max_attempts", 1)
+
+    email = "rate-limit-reset-unique-20261002@example.com"
+    recovery_key = f"password-recovery:testclient:{email}"
+
+    redis_client.delete(recovery_key)
+
+    payload = {
+        "email": email,
+    }
+
+    first_response = client.post(
+        "/api/v1/auth/forgot-password",
+        json=payload,
+    )
+
+    second_response = client.post(
+        "/api/v1/auth/forgot-password",
+        json=payload,
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert second_response.json() == {
+        "detail": (
+            "Too many password recovery attempts. "
+            "Please try again later."
+        ),
+    }
+
+    redis_client.delete(recovery_key)
+
+
+def test_forgot_password_sends_reset_email(
+    client,
+    email_service,
+    db_session,
+):
+    user = create_password_reset_test_user(db_session)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/forgot-password",
+        json={
+            "email": user.email,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "message": (
+            "If an account exists with that email, "
+            "a password reset link has been sent."
+        ),
+    }
+
+    assert len(email_service.sent_emails) == 1
+
+    sent_email = email_service.sent_emails[0]
+
+    assert sent_email["recipient"] == user.email
+    assert sent_email["subject"] == "Reset your NexaWork password"
+    assert "Reset your password using this link:" in sent_email["body"]
+    assert "token=" in sent_email["body"]
+
+
+def test_forgot_password_email_token_can_reset_password(
+    client,
+    email_service,
+    db_session,
+):
+    user = create_password_reset_test_user(db_session)
+    user.password_hash = hash_password("OldPassword123!")
+    db_session.commit()
+
+    forgot_response = client.post(
+        "/api/v1/auth/forgot-password",
+        json={
+            "email": user.email,
+        },
+    )
+
+    assert forgot_response.status_code == 200
+    assert len(email_service.sent_emails) == 1
+
+    sent_email = email_service.sent_emails[0]
+    body = sent_email["body"]
+
+    reset_url = next(
+        line
+        for line in body.splitlines()
+        if "reset-password?token=" in line
+    )
+
+    raw_token = reset_url.split("token=", 1)[1]
+
+    reset_response = client.post(
+        "/api/v1/auth/reset-password",
+        json={
+            "token": raw_token,
+            "new_password": "NewPassword123!",
+        },
+    )
+
+    assert reset_response.status_code == 200
+    assert reset_response.json() == {
+        "message": "Password reset successful",
+    }
+
+    db_session.refresh(user)
+
+    assert verify_password(
+        "NewPassword123!",
+        user.password_hash,
+    )
+    assert not verify_password(
+        "OldPassword123!",
+        user.password_hash,
+    )
+    assert user.token_version == 1

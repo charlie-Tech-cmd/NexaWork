@@ -11,6 +11,7 @@ from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
 from app.models.user import User
 from app.models.team import Team
+from app.models.password_reset_token import PasswordResetToken
 
 
 
@@ -25,4 +26,5 @@ __all__ = [
     "Role",
     "User",
     "Team",
+    "PasswordResetToken",
 ]

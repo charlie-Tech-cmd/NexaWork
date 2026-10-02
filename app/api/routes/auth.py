@@ -6,7 +6,10 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_user
 from app.core.security.password import hash_password, verify_password
 from app.core.security.jwt import create_access_token
-from app.core.rate_limit import is_login_allowed
+from app.core.rate_limit import (
+    is_login_allowed,
+    is_password_recovery_allowed,
+)
 from app.db.session import get_db
 from app.models.employee import Employee
 from app.models.organization import Organization
@@ -16,11 +19,24 @@ from app.models.role_permission import role_permissions
 from app.models.user import User
 from app.models.user_role import user_roles
 from app.schemas.employee import EmployeeLogin
-from app.schemas.user import AdminLogin
-from app.schemas.user import UserCreate, UserLogin, UserResponse
+from app.services.password_reset_service import reset_password
+from app.schemas.user import (
+    AdminLogin,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
+from app.api.dependencies_email import get_email_service
+from app.services.email.service import EmailService
+from app.services.password_recovery_service import (
+    send_password_reset_email,
+)
 
 
 router = APIRouter(prefix="/api/v1")
+
 
 @router.post("/auth/register", status_code=status.HTTP_201_CREATED)
 async def register_user(
@@ -54,6 +70,7 @@ async def register_user(
         "email": new_user.email,
         "full_name": new_user.full_name,
     }
+
 
 @router.post("/auth/login")
 async def login_user(
@@ -110,7 +127,10 @@ async def login_user(
             detail="Organization is inactive or unavailable",
         )
 
-    access_token = create_access_token(str(db_user.id))
+    access_token = create_access_token(
+        str(db_user.id),
+        token_version=db_user.token_version,
+    )
 
     return {
         "message": "Login successful",
@@ -119,6 +139,70 @@ async def login_user(
         "full_name": db_user.full_name,
         "access_token": access_token,
     }
+
+
+@router.post("/auth/forgot-password")
+async def forgot_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service),
+):
+    recovery_key = (
+        f"password-recovery:{request.client.host}:"
+        f"{payload.email.lower()}"
+    )
+
+    if not is_password_recovery_allowed(recovery_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many password recovery attempts. Please try again later.",
+        )
+
+    db_user = db.scalar(
+        select(User).where(
+            User.email == payload.email,
+        )
+    )
+
+    if db_user is not None and db_user.is_active:
+        send_password_reset_email(
+            db,
+            db_user,
+            email_service,
+        )
+        db.commit()
+
+    return {
+        "message": (
+            "If an account exists with that email, "
+            "a password reset link has been sent."
+        ),
+    }
+
+@router.post("/auth/reset-password")
+async def reset_password_endpoint(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        reset_password(
+            db,
+            payload.token,
+            payload.new_password,
+        )
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+    return {
+        "message": "Password reset successful",
+    }
+
 
 @router.post("/auth/employee/login")
 async def employee_login(
@@ -188,7 +272,10 @@ async def employee_login(
             detail="Organization is inactive or unavailable",
         )
 
-    access_token = create_access_token(str(db_user.id))
+    access_token = create_access_token(
+        str(db_user.id),
+        token_version=db_user.token_version,
+    )
 
     return {
         "message": "Login successful",
@@ -199,11 +286,13 @@ async def employee_login(
         "access_token": access_token,
     }
 
+
 @router.get("/auth/me", response_model=UserResponse)
 async def get_current_user_profile(
     current_user: User = Depends(get_current_user),
 ):
     return current_user
+
 
 @router.post("/auth/admin/login")
 async def admin_login(
@@ -290,6 +379,8 @@ async def admin_login(
     access_token = create_access_token(
         str(db_user.id),
         auth_type="admin",
+        token_version=db_user.token_version,
+
     )
 
     return {
@@ -345,6 +436,8 @@ async def super_admin_login(
     access_token = create_access_token(
         str(db_user.id),
         auth_type="super_admin",
+        token_version=db_user.token_version,
+
     )
 
     return {

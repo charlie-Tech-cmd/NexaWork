@@ -64,3 +64,23 @@ def create_employee_test_data(db_session):
     db_session.commit()
 
     return user, employee
+
+
+def create_password_reset_test_user(db_session):
+    organization = Organization(
+        name="Password Reset Organization",
+        slug="password-reset-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="reset@example.com",
+        password_hash="test-password-hash",
+        full_name="Reset User",
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    return user

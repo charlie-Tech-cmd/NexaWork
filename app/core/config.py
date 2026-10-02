@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 30
 
+    password_reset_token_expire_minutes: int = 30
+    password_reset_url: str = "http://localhost:3000/reset-password"
+
     db_host: str = "localhost"
     db_port: int = 5432
     db_name: str = "nexawork"

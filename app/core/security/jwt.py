@@ -9,6 +9,7 @@ from app.core.config import settings
 def create_access_token(
     subject: str,
     auth_type: str | None = None,
+    token_version: int = 0,
 ) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=settings.jwt_access_token_expire_minutes
@@ -17,6 +18,7 @@ def create_access_token(
     payload = {
         "sub": subject,
         "exp": expires_at,
+        "token_version": token_version,
     }
 
     if auth_type is not None:

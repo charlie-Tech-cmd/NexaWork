@@ -17,6 +17,24 @@ from app.models.employee import Employee
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
+def validate_token_version(
+    payload: dict,
+    db_user: User,
+) -> None:
+    token_version = payload.get("token_version")
+
+    if token_version is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
+    if token_version != db_user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
@@ -42,6 +60,7 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
+    validate_token_version(payload, db_user)
 
     organization = db.scalar(
         select(Organization).where(
@@ -90,6 +109,7 @@ def get_current_admin(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
+    validate_token_version(payload, db_user)
 
     organization = db.scalar(
         select(Organization).where(
@@ -141,6 +161,7 @@ def get_current_super_admin(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Super Admin access required",
         )
+    validate_token_version(payload, db_user)
 
     return db_user
 
