@@ -344,6 +344,229 @@ def test_admin_login_rejects_user_without_admin_permission(
         "detail": "Admin access required",
     }
 
+
+def test_super_admin_login_returns_super_admin_token(
+    client,
+    db_session,
+):
+    user = User(
+        organization_id=None,
+        email="super.admin.login@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Super Admin Login User",
+        is_active=True,
+        is_super_admin=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["message"] == "Super Admin login successful"
+    assert data["id"] == user.id
+    assert data["email"] == user.email
+    assert data["full_name"] == user.full_name
+    assert data["access_token"]
+
+    payload = jwt.decode(
+        data["access_token"],
+        settings.jwt_secret_key,
+        algorithms=[settings.jwt_algorithm],
+    )
+
+    assert payload["sub"] == str(user.id)
+    assert payload["auth_type"] == "super_admin"
+
+
+def test_super_admin_login_rejects_wrong_password(
+    client,
+    db_session,
+):
+    user = User(
+        organization_id=None,
+        email="super.admin.wrong.password@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Super Admin Wrong Password",
+        is_active=True,
+        is_super_admin=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": user.email,
+            "password": "WrongPassword123!",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid email or password",
+    }
+
+
+def test_super_admin_login_rejects_normal_user(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Super Admin Normal User Organization",
+        slug="super-admin-normal-user-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="normal.super.admin.login@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Normal Organization User",
+        is_active=True,
+        is_super_admin=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid email or password",
+    }
+
+
+def test_super_admin_login_rejects_organization_admin(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Super Admin Organization Admin",
+        slug="super-admin-organization-admin",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    permission = Permission(
+        name="ADMIN_ACCESS",
+        description="Access administrative portal",
+        is_active=True,
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Organization Admin",
+        description="Organization administrator",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="organization.admin.super.login@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization Admin",
+        is_active=True,
+        is_super_admin=False,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid email or password",
+    }
+
+
+def test_super_admin_login_rejects_inactive_super_admin(
+    client,
+    db_session,
+):
+    user = User(
+        organization_id=None,
+        email="inactive.super.admin@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Super Admin",
+        is_active=False,
+        is_super_admin=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid email or password",
+    }
+
+
+def test_super_admin_login_rejects_rate_limited_request(client):
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=False,
+    ):
+        response = client.post(
+            "/api/v1/auth/super-admin/login",
+            json={
+                "email": "super.admin@example.com",
+                "password": "SecurePassword123!",
+            },
+        )
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == (
+        "Too many login attempts. Please try again later."
+    )
+
 def test_login_rejects_rate_limited_request(client):
     with patch(
         "app.api.routes.auth.is_login_allowed",

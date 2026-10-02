@@ -299,3 +299,58 @@ async def admin_login(
         "full_name": db_user.full_name,
         "access_token": access_token,
     }
+
+
+@router.post("/auth/super-admin/login")
+async def super_admin_login(
+    request: Request,
+    super_admin_login: AdminLogin,
+    db: Session = Depends(get_db),
+):
+    login_key = (
+        f"super-admin-login:{request.client.host}:"
+        f"{super_admin_login.email.lower()}"
+    )
+
+    if not is_login_allowed(login_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later.",
+        )
+
+    db_user = db.scalar(
+        select(User).where(
+            User.email == super_admin_login.email,
+            User.is_active.is_(True),
+            User.is_super_admin.is_(True),
+            User.organization_id.is_(None),
+        )
+    )
+
+    if db_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    if not verify_password(
+        super_admin_login.password,
+        db_user.password_hash,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    access_token = create_access_token(
+        str(db_user.id),
+        auth_type="super_admin",
+    )
+
+    return {
+        "message": "Super Admin login successful",
+        "id": db_user.id,
+        "email": db_user.email,
+        "full_name": db_user.full_name,
+        "access_token": access_token,
+    }
