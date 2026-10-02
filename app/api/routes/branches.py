@@ -38,6 +38,7 @@ async def create_branch(
         select(Region).where(
             Region.id == region_id,
             Region.organization_id == current_organization.id,
+            Region.is_active.is_(True),
         )
     )
 
@@ -110,6 +111,7 @@ async def list_branches(
         select(Region).where(
             Region.id == region_id,
             Region.organization_id == current_organization.id,
+            Region.is_active.is_(True),
         )
     )
 

@@ -260,3 +260,122 @@ def test_create_branch_rejects_another_organization(
     )
 
     assert created_branch is None
+
+
+def test_create_branch_rejects_inactive_region(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Region Organization",
+        slug="inactive-region-create-org",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Region",
+        slug="inactive-region-create",
+        is_active=False,
+    )
+    db_session.add(region)
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.region.create@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Region Create User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.region.create@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.post(
+        f"/api/v1/branches/regions/{region.id}",
+        json={
+            "name": "Blocked Branch",
+            "slug": "blocked-branch",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Region not found"}
+
+    created_branch = db_session.scalar(
+        select(Branch).where(Branch.slug == "blocked-branch")
+    )
+
+    assert created_branch is None
+
+
+def test_list_branches_rejects_inactive_region(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Region List Organization",
+        slug="inactive-region-list-org",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Region",
+        slug="inactive-region-list",
+        is_active=False,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Region Branch",
+        slug="inactive-region-branch",
+    )
+    db_session.add(branch)
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.region.list@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Region List User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.region.list@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/branches/regions/{region.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Region not found"}
