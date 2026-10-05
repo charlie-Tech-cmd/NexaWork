@@ -3,9 +3,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
-from app.core.security.password import hash_password, verify_password
+from app.core.security.password import verify_password
 from app.db.session import get_db
 from app.models.user import User
+from app.services.user_service import create_user as create_user_service
 from app.schemas.user import (
     AdminUserCreate,
     UserDeactivate,
@@ -29,29 +30,20 @@ async def create_user(
     current_user: User = Depends(require_permission("USER_CREATE")),
     db: Session = Depends(get_db),
 ):
-    existing_user = db.scalar(
-        select(User).where(User.email == user_data.email)
-    )
-
-    if existing_user is not None:
+    try:
+        return create_user_service(
+            db=db,
+            organization_id=current_user.organization_id,
+            email=user_data.email,
+            password=user_data.password,
+            full_name=user_data.full_name,
+        )
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
-        )
+            detail=str(exc),
+        ) from exc
 
-    new_user = User(
-        organization_id=current_user.organization_id,
-        email=user_data.email,
-        password_hash=hash_password(user_data.password),
-        full_name=user_data.full_name,
-    )
-
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return new_user
 
 @router.put(
     "/{user_id}",
