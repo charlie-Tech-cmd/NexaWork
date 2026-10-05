@@ -60,6 +60,23 @@ def deactivate_user(
 
     return user
 
+
+def list_users(
+    db: Session,
+    organization_id: int,
+) -> list[User]:
+    users = db.scalars(
+        select(User)
+        .where(
+            User.organization_id == organization_id,
+            User.is_active.is_(True),
+        )
+        .order_by(User.id)
+    ).all()
+
+    return users
+
+
 def update_user(
     db: Session,
     user_id: int,

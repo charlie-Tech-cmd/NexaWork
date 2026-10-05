@@ -9,6 +9,7 @@ from app.models.user import User
 from app.services.user_service import (
     create_user as create_user_service,
     deactivate_user as deactivate_user_service,
+    list_users as list_users_service,
     update_user as update_user_service,
 )
 
@@ -117,16 +118,10 @@ async def list_users(
     current_user: User = Depends(require_permission("USER_VIEW")),
     db: Session = Depends(get_db),
 ):
-    users = db.scalars(
-        select(User)
-        .where(
-            User.organization_id == current_user.organization_id,
-            User.is_active.is_(True),
-        )
-        .order_by(User.id)
-    ).all()
-
-    return users
+    return list_users_service(
+        db=db,
+        organization_id=current_user.organization_id,
+    )
 
 
 @router.get(
