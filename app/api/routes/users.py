@@ -172,6 +172,7 @@ async def get_user(
         select(User).where(
             User.id == user_id,
             User.organization_id == current_user.organization_id,
+            User.is_active.is_(True),
         )
     )
 
