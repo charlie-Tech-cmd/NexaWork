@@ -79,6 +79,7 @@ async def update_user(
             detail=str(exc),
         ) from exc
 
+
 @router.delete(
     "/{user_id}",
     response_model=UserResponse,
