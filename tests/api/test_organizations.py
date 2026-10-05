@@ -154,6 +154,53 @@ def test_get_my_organization_returns_current_organization(
     assert response_data["is_active"] is True
 
 
+def test_inactive_organization_blocks_current_user(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Organization",
+        slug="inactive-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.organization@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Organization User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.organization@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    organization.is_active = False
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/organizations/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Organization is inactive or unavailable",
+    }
+
+
 def test_update_my_organization(
     client,
     db_session,
