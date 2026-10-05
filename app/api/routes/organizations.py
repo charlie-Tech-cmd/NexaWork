@@ -24,6 +24,7 @@ from app.schemas.organization import (
     OrganizationOnboardingCreate,
     OrganizationOnboardingResponse,
     OrganizationResponse,
+    OrganizationStatusUpdate,
     OrganizationUpdate,
 )
 
@@ -176,6 +177,35 @@ async def create_organization(
     db.refresh(new_organization)
 
     return new_organization
+
+
+@router.patch(
+    "/{organization_id}/status",
+    response_model=OrganizationResponse,
+)
+async def update_organization_status(
+    organization_id: int,
+    status_update: OrganizationStatusUpdate,
+    current_user: User = Depends(get_current_super_admin),
+    db: Session = Depends(get_db),
+):
+    organization = db.scalar(
+        select(Organization).where(
+            Organization.id == organization_id,
+        )
+    )
+
+    if organization is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found",
+        )
+
+    organization.is_active = status_update.is_active
+    db.commit()
+    db.refresh(organization)
+
+    return organization
 
 
 @router.get(

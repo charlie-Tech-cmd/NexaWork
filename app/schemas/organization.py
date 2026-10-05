@@ -21,6 +21,10 @@ class OrganizationUpdate(BaseModel):
         return self
 
 
+class OrganizationStatusUpdate(BaseModel):
+    is_active: bool
+
+
 class OrganizationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

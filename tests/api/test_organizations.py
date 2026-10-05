@@ -634,3 +634,139 @@ def test_organization_onboarding_grants_organization_update_permission(
         )
     )
     assert user_role_exists == admin_id
+
+
+def test_update_organization_status_requires_super_admin(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Status Protected Organization",
+        slug="status-protected-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="status.user@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "status.user@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.patch(
+        f"/api/v1/organizations/{organization.id}/status",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"is_active": False},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Super Admin authentication required",
+    }
+
+    db_session.refresh(organization)
+    assert organization.is_active is True
+
+
+def test_update_organization_status_allows_super_admin(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Status Organization",
+        slug="status-organization",
+    )
+    db_session.add(organization)
+
+    super_admin = User(
+        organization_id=None,
+        email="status.superadmin@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Status Super Admin",
+        is_active=True,
+        is_super_admin=True,
+    )
+    db_session.add(super_admin)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": "status.superadmin@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.patch(
+        f"/api/v1/organizations/{organization.id}/status",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"is_active": False},
+    )
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+    assert response_data["id"] == organization.id
+    assert response_data["is_active"] is False
+
+    db_session.refresh(organization)
+    assert organization.is_active is False
+
+
+def test_update_organization_status_rejects_missing_organization(
+    client,
+    db_session,
+):
+    super_admin = User(
+        organization_id=None,
+        email="missing.status.superadmin@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Missing Status Super Admin",
+        is_active=True,
+        is_super_admin=True,
+    )
+    db_session.add(super_admin)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": "missing.status.superadmin@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.patch(
+        "/api/v1/organizations/999999/status",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"is_active": False},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Organization not found",
+    }
