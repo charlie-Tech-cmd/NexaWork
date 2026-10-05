@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security.password import hash_password
+from app.core.security.password import hash_password, verify_password
 from app.models.user import User
 
 
@@ -32,6 +32,33 @@ def create_user(
 
     return new_user
 
+
+def deactivate_user(
+    db: Session,
+    user_id: int,
+    organization_id: int,
+    password: str,
+    current_user_password_hash: str,
+) -> User:
+    user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.organization_id == organization_id,
+        )
+    )
+
+    if user is None:
+        raise ValueError("User not found")
+
+    if not verify_password(password, current_user_password_hash):
+        raise ValueError("Invalid password")
+
+    user.is_active = False
+
+    db.commit()
+    db.refresh(user)
+
+    return user
 
 def update_user(
     db: Session,

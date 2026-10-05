@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.services.user_service import (
     create_user as create_user_service,
+    deactivate_user as deactivate_user_service,
     update_user as update_user_service,
 )
 
@@ -87,31 +88,26 @@ async def deactivate_user(
     current_user: User = Depends(require_permission("USER_DELETE")),
     db: Session = Depends(get_db),
 ):
-    user = db.scalar(
-        select(User).where(
-            User.id == user_id,
-            User.organization_id == current_user.organization_id,
+    try:
+        return deactivate_user_service(
+            db=db,
+            user_id=user_id,
+            organization_id=current_user.organization_id,
+            password=user_data.password,
+            current_user_password_hash=current_user.password_hash,
         )
-    )
+    except ValueError as exc:
+        if str(exc) == "Invalid password":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(exc),
+            ) from exc
 
-    if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
+            detail=str(exc),
+        ) from exc
 
-    if not verify_password(user_data.password, current_user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid password",
-        )
-
-    user.is_active = False
-
-    db.commit()
-    db.refresh(user)
-
-    return user
 
 @router.get(
     "",
