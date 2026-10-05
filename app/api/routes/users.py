@@ -6,7 +6,11 @@ from app.api.dependencies import require_permission
 from app.core.security.password import verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.services.user_service import create_user as create_user_service
+from app.services.user_service import (
+    create_user as create_user_service,
+    update_user as update_user_service,
+)
+
 from app.schemas.user import (
     AdminUserCreate,
     UserDeactivate,
@@ -45,55 +49,33 @@ async def create_user(
         ) from exc
 
 
-@router.put(
-    "/{user_id}",
-    response_model=UserResponse,
-)
+@router.put("/{user_id}", response_model=UserResponse)
 async def update_user(
     user_id: int,
     user_data: UserUpdate,
     current_user: User = Depends(require_permission("USER_UPDATE")),
     db: Session = Depends(get_db),
 ):
-    user = db.scalar(
-        select(User).where(
-            User.id == user_id,
-            User.organization_id == current_user.organization_id,
+    try:
+        return update_user_service(
+            db=db,
+            user_id=user_id,
+            organization_id=current_user.organization_id,
+            email=user_data.email,
+            full_name=user_data.full_name,
+            is_active=user_data.is_active,
         )
-    )
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    if user_data.email is not None:
-        existing_user = db.scalar(
-            select(User).where(
-                User.email == user_data.email,
-                User.id != user_id,
-            )
-        )
-
-        if existing_user is not None:
+    except ValueError as exc:
+        if str(exc) == "Email already registered":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered",
-            )
+                detail=str(exc),
+            ) from exc
 
-        user.email = user_data.email
-
-    if user_data.full_name is not None:
-        user.full_name = user_data.full_name
-
-    if user_data.is_active is not None:
-        user.is_active = user_data.is_active
-
-    db.commit()
-    db.refresh(user)
-
-    return user
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
 @router.delete(
     "/{user_id}",

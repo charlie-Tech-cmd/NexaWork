@@ -31,3 +31,46 @@ def create_user(
     db.refresh(new_user)
 
     return new_user
+
+
+def update_user(
+    db: Session,
+    user_id: int,
+    organization_id: int,
+    email: str | None,
+    full_name: str | None,
+    is_active: bool | None,
+) -> User:
+    user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.organization_id == organization_id,
+        )
+    )
+
+    if user is None:
+        raise ValueError("User not found")
+
+    if email is not None:
+        existing_user = db.scalar(
+            select(User).where(
+                User.email == email,
+                User.id != user_id,
+            )
+        )
+
+        if existing_user is not None:
+            raise ValueError("Email already registered")
+
+        user.email = email
+
+    if full_name is not None:
+        user.full_name = full_name
+
+    if is_active is not None:
+        user.is_active = is_active
+
+    db.commit()
+    db.refresh(user)
+
+    return user
