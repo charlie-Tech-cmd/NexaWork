@@ -201,6 +201,97 @@ def test_inactive_organization_blocks_current_user(
     }
 
 
+def test_reactivated_organization_restores_current_user_access(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Reactivated Organization",
+        slug="reactivated-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="reactivated.organization@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Reactivated Organization User",
+        is_active=True,
+    )
+    db_session.add(user)
+
+    super_admin = User(
+        organization_id=None,
+        email="reactivated.superadmin@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Reactivated Super Admin",
+        is_active=True,
+        is_super_admin=True,
+    )
+    db_session.add(super_admin)
+    db_session.commit()
+
+    user_login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "reactivated.organization@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert user_login_response.status_code == 200
+
+    user_access_token = user_login_response.json()["access_token"]
+
+    organization.is_active = False
+    db_session.commit()
+
+    blocked_response = client.get(
+        "/api/v1/organizations/me",
+        headers={"Authorization": f"Bearer {user_access_token}"},
+    )
+
+    assert blocked_response.status_code == 403
+    assert blocked_response.json() == {
+        "detail": "Organization is inactive or unavailable",
+    }
+
+    super_admin_login_response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": "reactivated.superadmin@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert super_admin_login_response.status_code == 200
+
+    super_admin_access_token = super_admin_login_response.json()[
+        "access_token"]
+
+    reactivate_response = client.patch(
+        f"/api/v1/organizations/{organization.id}/status",
+        headers={
+            "Authorization": f"Bearer {super_admin_access_token}",
+        },
+        json={"is_active": True},
+    )
+
+    assert reactivate_response.status_code == 200
+    assert reactivate_response.json()["is_active"] is True
+
+    db_session.refresh(organization)
+    assert organization.is_active is True
+
+    restored_response = client.get(
+        "/api/v1/organizations/me",
+        headers={"Authorization": f"Bearer {user_access_token}"},
+    )
+
+    assert restored_response.status_code == 200
+    assert restored_response.json()["id"] == organization.id
+    assert restored_response.json()["is_active"] is True
+
+
 def test_update_my_organization(
     client,
     db_session,
