@@ -117,7 +117,10 @@ async def list_teams(
 
     teams = db.scalars(
         select(Team)
-        .where(Team.department_id == department_id)
+        .where(
+            Team.department_id == department_id,
+            Team.is_active.is_(True),
+        )
         .order_by(Team.id)
     ).all()
 
@@ -197,6 +200,7 @@ async def get_team(
         .join(Region, Branch.region_id == Region.id)
         .where(
             Team.id == team_id,
+            Team.is_active.is_(True),
             Department.is_active.is_(True),
             Branch.is_active.is_(True),
             Region.is_active.is_(True),

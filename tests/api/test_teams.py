@@ -132,6 +132,7 @@ def test_create_team_allows_current_organization(
     assert team.name == "Engineering Team"
     assert team.slug == "engineering-team"
 
+
 def test_create_team_rejects_another_organization(
     client,
     db_session,
@@ -243,6 +244,7 @@ def test_create_team_rejects_another_organization(
 
     assert team is None
 
+
 def test_get_team_allows_current_organization(
     client,
     db_session,
@@ -353,6 +355,110 @@ def test_get_team_allows_current_organization(
     assert response_data["name"] == "Engineering Team"
     assert response_data["slug"] == "engineering-team"
     assert response_data["is_active"] is True
+
+
+def test_get_team_rejects_inactive_team(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Team Organization",
+        slug="inactive-team-get",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Team Region",
+        slug="inactive-team-get-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Team Branch",
+        slug="inactive-team-get-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Team Department",
+        slug="inactive-team-get-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    team = Team(
+        department_id=department.id,
+        name="Inactive Team",
+        slug="inactive-team",
+        is_active=False,
+    )
+    db_session.add(team)
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.team.get@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Team User",
+        is_active=True,
+    )
+    db_session.add(user)
+
+    permission = Permission(
+        name="TEAM_VIEW",
+        description="View teams",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Inactive Team Viewer",
+        description="Can view teams",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.team.get@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/teams/{team.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Team not found"}
 
 
 def test_get_team_rejects_another_organization(
@@ -586,6 +692,122 @@ def test_list_teams_allows_current_organization(
     ]
 
 
+def test_list_teams_excludes_inactive_team(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Team List Organization",
+        slug="inactive-team-list",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Team List Region",
+        slug="inactive-team-list-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Team List Branch",
+        slug="inactive-team-list-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Team List Department",
+        slug="inactive-team-list-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    active_team = Team(
+        department_id=department.id,
+        name="Active Team",
+        slug="active-team",
+        is_active=True,
+    )
+    inactive_team = Team(
+        department_id=department.id,
+        name="Inactive Team",
+        slug="inactive-team",
+        is_active=False,
+    )
+    db_session.add_all([active_team, inactive_team])
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.team.list@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Team List User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = Permission(
+        name="TEAM_VIEW",
+        description="View teams",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Inactive Team List Viewer",
+        description="Can view teams",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.team.list@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/teams/departments/{department.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+
+    assert len(response_data) == 1
+    assert response_data[0]["id"] == active_team.id
+    assert response_data[0]["is_active"] is True
+
+
 def test_list_teams_rejects_another_organization(
     client,
     db_session,
@@ -693,6 +915,7 @@ def test_list_teams_rejects_another_organization(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Department not found"}
+
 
 def test_update_team_allows_current_organization(
     client,
@@ -1049,6 +1272,7 @@ def test_update_team_rejects_duplicate_slug(
 
     assert team_two.slug == "product-team"
 
+
 def test_create_team_rejects_without_permission(
     client,
     db_session,
@@ -1126,6 +1350,7 @@ def test_create_team_rejects_without_permission(
     )
 
     assert team is None
+
 
 def test_update_team_rejects_without_permission(
     client,
@@ -1211,6 +1436,7 @@ def test_update_team_rejects_without_permission(
     assert team.slug == "original-team-slug"
     assert team.is_active is True
 
+
 def test_list_teams_rejects_without_permission(
     client,
     db_session,
@@ -1284,6 +1510,7 @@ def test_list_teams_rejects_without_permission(
 
     assert response.status_code == 403
     assert response.json() == {"detail": "Permission denied"}
+
 
 def test_update_team_can_deactivate_team(
     client,
@@ -1395,6 +1622,7 @@ def test_update_team_can_deactivate_team(
     db_session.refresh(team)
 
     assert team.is_active is False
+
 
 def test_get_team_rejects_without_permission(
     client,
