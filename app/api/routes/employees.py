@@ -140,6 +140,7 @@ async def get_employee(
         .where(
             Employee.id == employee_id,
             Employee.organization_id == current_organization.id,
+            Employee.is_active.is_(True),
             Region.organization_id == current_organization.id,
             Region.is_active.is_(True),
             Branch.is_active.is_(True),
@@ -188,6 +189,7 @@ async def list_department_employees(
         .where(
             Employee.department_id == department_id,
             Employee.organization_id == current_organization.id,
+            Employee.is_active.is_(True),
         )
         .order_by(Employee.id)
     ).all()

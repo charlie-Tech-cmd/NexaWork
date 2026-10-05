@@ -1049,6 +1049,115 @@ def test_get_employee_allows_current_organization(
     assert response_data["updated_at"] is not None
 
 
+def test_get_employee_rejects_inactive_employee(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Employee Organization",
+        slug="inactive-employee-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Inactive Employee Region",
+        slug="inactive-employee-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Inactive Employee Branch",
+        slug="inactive-employee-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Inactive Employee Department",
+        slug="inactive-employee-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.employee@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Employee User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_VIEW",
+        description="View employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Viewer",
+        description="Can view employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id="EMP-INACTIVE-001",
+        branch_id=branch.id,
+        department_id=department.id,
+        job_title="Software Engineer",
+        is_active=False,
+    )
+
+    db_session.add(employee)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.employee@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/employees/{employee.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Employee not found"}
+
+
 def test_list_department_employees_rejects_another_organization(
     client,
     db_session,
@@ -1877,6 +1986,137 @@ def test_list_department_employees_excludes_employee_from_another_organization(
 
     assert [employee["id"] for employee in response_data] == [employee_a.id]
 
+
+def test_list_department_employees_excludes_inactive_employee(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Employee Lifecycle Organization",
+        slug="employee-lifecycle-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Employee Lifecycle Region",
+        slug="employee-lifecycle-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Employee Lifecycle Branch",
+        slug="employee-lifecycle-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Employee Lifecycle Department",
+        slug="employee-lifecycle-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    active_user = User(
+        organization_id=organization.id,
+        email="employee.lifecycle.active@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Active Employee User",
+        is_active=True,
+    )
+    inactive_user = User(
+        organization_id=organization.id,
+        email="employee.lifecycle.inactive@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Employee User",
+        is_active=True,
+    )
+    db_session.add_all([active_user, inactive_user])
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_VIEW",
+        description="View employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Employee Viewer",
+        description="Can view employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=active_user.id,
+            role_id=role.id,
+        )
+    )
+
+    active_employee = Employee(
+        organization_id=organization.id,
+        user_id=active_user.id,
+        employee_id="EMP-LIFECYCLE-ACTIVE",
+        branch_id=branch.id,
+        department_id=department.id,
+        job_title="Developer",
+        is_active=True,
+    )
+
+    inactive_employee = Employee(
+        organization_id=organization.id,
+        user_id=inactive_user.id,
+        employee_id="EMP-LIFECYCLE-INACTIVE",
+        branch_id=branch.id,
+        department_id=department.id,
+        job_title="Developer",
+        is_active=False,
+    )
+
+    db_session.add_all([active_employee, inactive_employee])
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "employee.lifecycle.active@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/employees/departments/{department.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+
+    response_data = response.json()
+
+    assert [employee["id"] for employee in response_data] == [
+        active_employee.id
+    ]
+    assert response_data[0]["is_active"] is True
 
 @pytest.mark.parametrize(
     "inactive_level",
