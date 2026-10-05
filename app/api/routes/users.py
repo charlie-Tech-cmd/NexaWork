@@ -149,7 +149,10 @@ async def list_users(
 ):
     users = db.scalars(
         select(User)
-        .where(User.organization_id == current_user.organization_id)
+        .where(
+            User.organization_id == current_user.organization_id,
+            User.is_active.is_(True),
+        )
         .order_by(User.id)
     ).all()
 

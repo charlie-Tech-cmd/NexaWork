@@ -127,6 +127,99 @@ def test_list_users_allows_user_with_view_permission(client, db_session):
     ]
 
 
+def test_list_users_excludes_inactive_users(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="User List Organization",
+        slug="user-list-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    viewer = User(
+        organization_id=organization.id,
+        email="user.list.viewer@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="User List Viewer",
+        is_active=True,
+    )
+    active_user = User(
+        organization_id=organization.id,
+        email="user.list.active@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Active User",
+        is_active=True,
+    )
+    inactive_user = User(
+        organization_id=organization.id,
+        email="user.list.inactive@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive User",
+        is_active=False,
+    )
+
+    db_session.add_all([viewer, active_user, inactive_user])
+    db_session.flush()
+
+    permission = Permission(
+        name="USER_VIEW",
+        description="View users",
+        is_active=True,
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="User Viewer",
+        description="View users",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=viewer.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "user.list.viewer@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        "/api/v1/users",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+
+    user_ids = {user["id"] for user in response.json()}
+
+    assert viewer.id in user_ids
+    assert active_user.id in user_ids
+    assert inactive_user.id not in user_ids
+
+
 def test_get_user_rejects_user_from_another_organization(client, db_session):
     organization_a = Organization(
         name="Organization A",
