@@ -77,6 +77,25 @@ def list_users(
     return users
 
 
+def get_user(
+    db: Session,
+    user_id: int,
+    organization_id: int,
+) -> User:
+    user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.organization_id == organization_id,
+            User.is_active.is_(True),
+        )
+    )
+
+    if user is None:
+        raise ValueError("User not found")
+
+    return user
+
+
 def update_user(
     db: Session,
     user_id: int,

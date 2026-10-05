@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
@@ -9,6 +8,7 @@ from app.models.user import User
 from app.services.user_service import (
     create_user as create_user_service,
     deactivate_user as deactivate_user_service,
+    get_user as get_user_service,
     list_users as list_users_service,
     update_user as update_user_service,
 )
@@ -133,18 +133,14 @@ async def get_user(
     current_user: User = Depends(require_permission("USER_VIEW")),
     db: Session = Depends(get_db),
 ):
-    user = db.scalar(
-        select(User).where(
-            User.id == user_id,
-            User.organization_id == current_user.organization_id,
-            User.is_active.is_(True),
+    try:
+        return get_user_service(
+            db=db,
+            user_id=user_id,
+            organization_id=current_user.organization_id,
         )
-    )
-
-    if user is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    return user
+            detail=str(exc),
+        ) from exc
