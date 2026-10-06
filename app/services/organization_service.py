@@ -40,3 +40,21 @@ def update_organization_status(
     db.refresh(organization)
 
     return organization
+
+
+def get_organization(
+    db: Session,
+    organization_id: int,
+    current_organization_id: int,
+) -> Organization:
+    organization = db.scalar(
+        select(Organization).where(
+            Organization.id == organization_id,
+            Organization.id == current_organization_id,
+        )
+    )
+
+    if organization is None:
+        raise ValueError("Organization not found")
+
+    return organization

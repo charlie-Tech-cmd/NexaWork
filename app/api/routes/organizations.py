@@ -29,6 +29,7 @@ from app.schemas.organization import (
 )
 from app.services.organization_service import (
     create_organization as create_organization_service,
+    get_organization as get_organization_service,
     update_organization_status as update_organization_status_service,
 )
 
@@ -250,17 +251,14 @@ async def get_organization(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    organization = db.scalar(
-        select(Organization).where(
-            Organization.id == organization_id,
-            Organization.id == current_organization.id,
+    try:
+        return get_organization_service(
+            db=db,
+            organization_id=organization_id,
+            current_organization_id=current_organization.id,
         )
-    )
-
-    if organization is None:
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Organization not found",
         )
-
-    return organization
