@@ -58,3 +58,21 @@ def get_organization(
         raise ValueError("Organization not found")
 
     return organization
+
+
+def update_organization(
+    db: Session,
+    organization: Organization,
+    name: str | None,
+    slug: str | None,
+) -> Organization:
+    if name is not None:
+        organization.name = name
+
+    if slug is not None:
+        organization.slug = slug
+
+    db.commit()
+    db.refresh(organization)
+
+    return organization

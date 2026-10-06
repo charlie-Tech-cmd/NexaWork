@@ -30,6 +30,7 @@ from app.schemas.organization import (
 from app.services.organization_service import (
     create_organization as create_organization_service,
     get_organization as get_organization_service,
+    update_organization as update_organization_service,
     update_organization_status as update_organization_status_service,
 )
 
@@ -222,24 +223,19 @@ async def update_my_organization(
     ),
     db: Session = Depends(get_db),
 ):
-    if organization_update.name is not None:
-        current_organization.name = organization_update.name
-
-    if organization_update.slug is not None:
-        current_organization.slug = organization_update.slug
-
     try:
-        db.commit()
+        return update_organization_service(
+            db=db,
+            organization=current_organization,
+            name=organization_update.name,
+            slug=organization_update.slug,
+        )
     except IntegrityError:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Organization slug already exists",
         )
-
-    db.refresh(current_organization)
-
-    return current_organization
 
 
 @router.get(
