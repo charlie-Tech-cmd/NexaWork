@@ -23,6 +23,7 @@ from app.schemas.employee import (
 )
 from app.services.admin_employee_service import (
     create_employee as create_employee_service,
+    get_employee as get_employee_service,
 )
 
 router = APIRouter(
@@ -85,27 +86,17 @@ async def get_employee(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    employee = db.scalar(
-        select(Employee)
-        .join(Branch, Branch.id == Employee.branch_id)
-        .join(Region, Region.id == Branch.region_id)
-        .where(
-            Employee.id == employee_id,
-            Employee.organization_id == current_organization.id,
-            Employee.is_active.is_(True),
-            Region.organization_id == current_organization.id,
-            Region.is_active.is_(True),
-            Branch.is_active.is_(True),
+    try:
+        return get_employee_service(
+            db=db,
+            organization_id=current_organization.id,
+            employee_id=employee_id,
         )
-    )
-
-    if employee is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Employee not found",
+            detail=str(exc),
         )
-
-    return employee
 
 @router.get(
     "/departments/{department_id}",

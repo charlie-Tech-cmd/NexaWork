@@ -76,3 +76,28 @@ def create_employee(
     db.refresh(new_employee)
 
     return new_employee
+
+
+def get_employee(
+    db: Session,
+    organization_id: int,
+    employee_id: int,
+) -> Employee:
+    employee = db.scalar(
+        select(Employee)
+        .join(Branch, Branch.id == Employee.branch_id)
+        .join(Region, Region.id == Branch.region_id)
+        .where(
+            Employee.id == employee_id,
+            Employee.organization_id == organization_id,
+            Employee.is_active.is_(True),
+            Region.organization_id == organization_id,
+            Region.is_active.is_(True),
+            Branch.is_active.is_(True),
+        )
+    )
+
+    if employee is None:
+        raise ValueError("Employee not found")
+
+    return employee
