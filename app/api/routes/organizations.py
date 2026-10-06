@@ -27,6 +27,7 @@ from app.schemas.organization import (
     OrganizationStatusUpdate,
     OrganizationUpdate,
 )
+from app.services.organization_service import create_organization as create_organization_service
 
 
 router = APIRouter(
@@ -158,25 +159,18 @@ async def create_organization(
     current_user: User = Depends(get_current_super_admin),
     db: Session = Depends(get_db),
 ):
-    new_organization = Organization(
-        name=organization.name,
-        slug=organization.slug,
-    )
-
-    db.add(new_organization)
-
     try:
-        db.commit()
+        return create_organization_service(
+            db=db,
+            name=organization.name,
+            slug=organization.slug,
+        )
     except IntegrityError:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Organization slug already exists",
         )
-
-    db.refresh(new_organization)
-
-    return new_organization
 
 
 @router.patch(
