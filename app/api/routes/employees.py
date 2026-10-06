@@ -21,7 +21,9 @@ from app.schemas.employee import (
     EmployeeResponse,
     EmployeeUpdate,
 )
-
+from app.services.admin_employee_service import (
+    create_employee as create_employee_service,
+)
 
 router = APIRouter(
     prefix="/api/v1/employees",
@@ -40,69 +42,22 @@ async def create_employee(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-
-    user = db.scalar(
-        select(User).where(
-            User.id == employee.user_id,
-            User.organization_id == current_organization.id,
-            User.is_active.is_(True),
-        )
-    )
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    branch = db.scalar(
-        select(Branch)
-        .join(Region, Region.id == Branch.region_id)
-        .where(
-            Branch.id == employee.branch_id,
-            Region.organization_id == current_organization.id,
-            Region.is_active.is_(True),
-            Branch.is_active.is_(True),
-
-
-        )
-    )
-
-    if branch is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Branch not found",
-        )
-
-    department = db.scalar(
-        select(Department).where(
-            Department.id == employee.department_id,
-            Department.branch_id == branch.id,
-            Department.is_active.is_(True),
-
-        )
-    )
-
-    if department is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Department not found",
-        )
-
-    new_employee = Employee(
-        organization_id=current_organization.id,
-        user_id=employee.user_id,
-        employee_id=employee.employee_id,
-        branch_id=employee.branch_id,
-        department_id=employee.department_id,
-        job_title=employee.job_title,
-        profile_picture=employee.profile_picture,
-    )
-
-    db.add(new_employee)
-
     try:
-        db.commit()
+        return create_employee_service(
+            db=db,
+            organization_id=current_organization.id,
+            user_id=employee.user_id,
+            employee_id=employee.employee_id,
+            branch_id=employee.branch_id,
+            department_id=employee.department_id,
+            job_title=employee.job_title,
+            profile_picture=employee.profile_picture,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
     except IntegrityError:
         db.rollback()
         raise HTTPException(
@@ -110,9 +65,6 @@ async def create_employee(
             detail="Employee ID or user is already assigned",
         )
 
-    db.refresh(new_employee)
-
-    return new_employee
 
 @router.get(
     "/me",
