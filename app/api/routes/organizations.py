@@ -27,7 +27,10 @@ from app.schemas.organization import (
     OrganizationStatusUpdate,
     OrganizationUpdate,
 )
-from app.services.organization_service import create_organization as create_organization_service
+from app.services.organization_service import (
+    create_organization as create_organization_service,
+    update_organization_status as update_organization_status_service,
+)
 
 
 router = APIRouter(
@@ -183,23 +186,17 @@ async def update_organization_status(
     current_user: User = Depends(get_current_super_admin),
     db: Session = Depends(get_db),
 ):
-    organization = db.scalar(
-        select(Organization).where(
-            Organization.id == organization_id,
+    try:
+        return update_organization_status_service(
+            db=db,
+            organization_id=organization_id,
+            is_active=status_update.is_active,
         )
-    )
-
-    if organization is None:
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Organization not found",
         )
-
-    organization.is_active = status_update.is_active
-    db.commit()
-    db.refresh(organization)
-
-    return organization
 
 
 @router.get(
