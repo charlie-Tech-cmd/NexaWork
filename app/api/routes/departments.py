@@ -1,21 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_organization, get_current_user
 from app.db.session import get_db
-from app.models.department import Department
-from app.models.branch import Branch
 from app.models.organization import Organization
-from app.models.region import Region
 from app.models.user import User
 from app.schemas.department import (
     DepartmentCreate,
     DepartmentResponse,
     DepartmentUpdate,
 )
-
+from app.services.department_service import (
+    create_department as create_department_service,
+    get_department as get_department_service,
+    list_branch_departments as list_branch_departments_service,
+    update_department as update_department_service,
+)
 
 router = APIRouter(
     prefix="/api/v1/departments",
@@ -31,47 +32,29 @@ router = APIRouter(
 async def create_department(
     branch_id: int,
     department: DepartmentCreate,
-    current_user: User = Depends(get_current_user),
     current_organization: Organization = Depends(get_current_organization),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    branch = db.scalar(
-        select(Branch)
-        .join(Region, Branch.region_id == Region.id)
-        .where(
-            Branch.id == branch_id,
-            Branch.is_active.is_(True),
-            Region.organization_id == current_organization.id,
-            Region.is_active.is_(True),
+    try:
+        return create_department_service(
+            db,
+            current_organization.id,
+            branch_id,
+            department.name,
+            department.slug,
         )
-    )
-
-    if branch is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Branch not found",
+            detail=str(exc),
         )
-
-    new_department = Department(
-        branch_id=branch_id,
-        name=department.name,
-        slug=department.slug,
-    )
-
-    db.add(new_department)
-
-    try:
-        db.commit()
     except IntegrityError:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Department slug already exists for this branch",
         )
 
-    db.refresh(new_department)
-
-    return new_department
 
 @router.get(
     "/{department_id}",
@@ -79,29 +62,22 @@ async def create_department(
 )
 async def get_department(
     department_id: int,
-    current_user: User = Depends(get_current_user),
     current_organization: Organization = Depends(get_current_organization),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    department = db.scalar(
-        select(Department)
-        .join(Branch, Department.branch_id == Branch.id)
-        .join(Region, Branch.region_id == Region.id)
-        .where(
-            Department.id == department_id,
-            Region.organization_id == current_organization.id,
-            Region.is_active.is_(True),
-            Branch.is_active.is_(True),
+    try:
+        return get_department_service(
+            db,
+            current_organization.id,
+            department_id,
         )
-    )
-
-    if department is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Department not found",
+            detail=str(exc),
         )
 
-    return department
 
 @router.get(
     "/branches/{branch_id}",
@@ -109,34 +85,22 @@ async def get_department(
 )
 async def list_departments(
     branch_id: int,
-    current_user: User = Depends(get_current_user),
     current_organization: Organization = Depends(get_current_organization),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    branch = db.scalar(
-        select(Branch)
-        .join(Region, Branch.region_id == Region.id)
-        .where(
-            Branch.id == branch_id,
-            Branch.is_active.is_(True),
-            Region.organization_id == current_organization.id,
-            Region.is_active.is_(True),
+    try:
+        return list_branch_departments_service(
+            db,
+            current_organization.id,
+            branch_id,
         )
-    )
-
-    if branch is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Branch not found",
+            detail=str(exc),
         )
 
-    departments = db.scalars(
-        select(Department)
-        .where(Department.branch_id == branch_id)
-        .order_by(Department.id)
-    ).all()
-
-    return departments
 
 @router.put(
     "/{department_id}",
@@ -145,46 +109,26 @@ async def list_departments(
 async def update_department(
     department_id: int,
     department_data: DepartmentUpdate,
-    current_user: User = Depends(get_current_user),
     current_organization: Organization = Depends(get_current_organization),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    department = db.scalar(
-        select(Department)
-        .join(Branch, Department.branch_id == Branch.id)
-        .join(Region, Branch.region_id == Region.id)
-        .where(
-            Department.id == department_id,
-            Region.organization_id == current_organization.id,
-            Region.is_active.is_(True),
-            Branch.is_active.is_(True),
+    try:
+        return update_department_service(
+            db,
+            current_organization.id,
+            department_id,
+            department_data.name,
+            department_data.slug,
+            department_data.is_active,
         )
-    )
-
-    if department is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Department not found",
+            detail=str(exc),
         )
-
-    if department_data.name is not None:
-        department.name = department_data.name
-
-    if department_data.slug is not None:
-        department.slug = department_data.slug
-
-    if department_data.is_active is not None:
-        department.is_active = department_data.is_active
-
-    try:
-        db.commit()
     except IntegrityError:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Department slug already exists for this branch",
         )
-
-    db.refresh(department)
-
-    return department
