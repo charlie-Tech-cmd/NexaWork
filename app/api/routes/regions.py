@@ -1,17 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 
 from app.api.dependencies import get_current_organization, get_current_user
 from app.db.session import get_db
-from app.models.region import Region
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.region import (
     RegionCreate,
     RegionResponse,
     RegionUpdate,
+)
+from app.services.region_service import (
+    create_region as create_region_service,
+    get_region as get_region_service,
+    list_regions as list_regions_service,
+    update_region as update_region_service,
 )
 
 router = APIRouter(
@@ -38,26 +42,19 @@ async def create_region(
             detail="Organization not found",
         )
 
-    new_region = Region(
-        organization_id=current_organization.id,
-        name=region.name,
-        slug=region.slug,
-    )
-
-    db.add(new_region)
-
     try:
-        db.commit()
+        return create_region_service(
+            db,
+            current_organization.id,
+            region.name,
+            region.slug,
+        )
     except IntegrityError:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Region slug already exists for this organization",
         )
 
-    db.refresh(new_region)
-
-    return new_region
 
 @router.get(
     "/{region_id}",
@@ -69,21 +66,18 @@ async def get_region(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    region = db.scalar(
-        select(Region).where(
-            Region.id == region_id,
-            Region.organization_id == current_organization.id,
-            Region.is_active.is_(True),
+    try:
+        return get_region_service(
+            db,
+            current_organization.id,
+            region_id,
         )
-    )
-
-    if region is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Region not found",
+            detail=str(exc),
         )
 
-    return region
 
 @router.get(
     "/organizations/{organization_id}",
@@ -101,16 +95,11 @@ async def list_regions(
             detail="Organization not found",
         )
 
-    regions = db.scalars(
-        select(Region)
-        .where(
-            Region.organization_id == current_organization.id,
-            Region.is_active.is_(True),
-        )
-        .order_by(Region.id)
-    ).all()
+    return list_regions_service(
+        db,
+        current_organization.id,
+    )
 
-    return regions
 
 @router.put(
     "/{region_id}",
@@ -123,37 +112,22 @@ async def update_region(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    region = db.scalar(
-        select(Region).where(
-            Region.id == region_id,
-            Region.organization_id == current_organization.id,
+    try:
+        return update_region_service(
+            db,
+            current_organization.id,
+            region_id,
+            region_data.name,
+            region_data.slug,
+            region_data.is_active,
         )
-    )
-
-    if region is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Region not found",
+            detail=str(exc),
         )
-
-    if region_data.name is not None:
-        region.name = region_data.name
-
-    if region_data.slug is not None:
-        region.slug = region_data.slug
-
-    if region_data.is_active is not None:
-        region.is_active = region_data.is_active
-
-    try:
-        db.commit()
     except IntegrityError:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Region slug already exists for this organization",
         )
-
-    db.refresh(region)
-
-    return region    
