@@ -197,3 +197,37 @@ def update_employee(
     db.refresh(employee)
 
     return employee
+
+
+def list_department_employees(
+    db: Session,
+    organization_id: int,
+    department_id: int,
+) -> list[Employee]:
+    department = db.scalar(
+        select(Department)
+        .join(Branch, Branch.id == Department.branch_id)
+        .join(Region, Region.id == Branch.region_id)
+        .where(
+            Department.id == department_id,
+            Department.is_active.is_(True),
+            Branch.is_active.is_(True),
+            Region.is_active.is_(True),
+            Region.organization_id == organization_id,
+        )
+    )
+
+    if department is None:
+        raise ValueError("Department not found")
+
+    employees = db.scalars(
+        select(Employee)
+        .where(
+            Employee.department_id == department_id,
+            Employee.organization_id == organization_id,
+            Employee.is_active.is_(True),
+        )
+        .order_by(Employee.id)
+    ).all()
+
+    return employees

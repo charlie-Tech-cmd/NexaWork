@@ -24,6 +24,7 @@ from app.schemas.employee import (
 from app.services.admin_employee_service import (
     create_employee as create_employee_service,
     get_employee as get_employee_service,
+    list_department_employees as list_department_employees_service,
     update_employee as update_employee_service,
 )
 
@@ -109,36 +110,18 @@ async def list_department_employees(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    department = db.scalar(
-        select(Department)
-        .join(Branch, Branch.id == Department.branch_id)
-        .join(Region, Region.id == Branch.region_id)
-        .where(
-            Department.id == department_id,
-            Department.is_active.is_(True),
-            Branch.is_active.is_(True),
-            Region.is_active.is_(True),
-            Region.organization_id == current_organization.id,
+    try:
+        return list_department_employees_service(
+            db=db,
+            organization_id=current_organization.id,
+            department_id=department_id,
         )
-    )
-
-    if department is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Department not found",
+            detail=str(exc),
         )
 
-    employees = db.scalars(
-        select(Employee)
-        .where(
-            Employee.department_id == department_id,
-            Employee.organization_id == current_organization.id,
-            Employee.is_active.is_(True),
-        )
-        .order_by(Employee.id)
-    ).all()
-
-    return employees
 
 @router.put(
     "/{employee_id}",
