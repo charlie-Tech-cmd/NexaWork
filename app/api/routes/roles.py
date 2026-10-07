@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -8,15 +7,21 @@ from app.api.dependencies import (
     require_any_permission,
     require_permission,
 )
-
 from app.db.session import get_db
-from app.models.permission import Permission
-from app.models.role import Role
-from app.models.role_permission import role_permissions
 from app.models.organization import Organization
 from app.models.user import User
-from app.schemas.role import RoleCreate, RoleResponse, RoleUpdate
 from app.schemas.permission import PermissionResponse
+from app.schemas.role import RoleCreate, RoleResponse, RoleUpdate
+from app.services.role_service import (
+    assign_permission_to_role as assign_permission_to_role_service,
+    create_role as create_role_service,
+    delete_role as delete_role_service,
+    get_role as get_role_service,
+    list_role_permissions as list_role_permissions_service,
+    list_roles as list_roles_service,
+    remove_permission_from_role as remove_permission_from_role_service,
+    update_role as update_role_service,
+)
 
 router = APIRouter(
     prefix="/api/v1/roles",
@@ -31,52 +36,38 @@ router = APIRouter(
 )
 async def create_role(
     role: RoleCreate,
-    current_user: User = Depends(
-        require_permission("ROLE_CREATE")
-    ),
+    current_user: User = Depends(require_permission("ROLE_CREATE")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-
-    new_role = Role(
-        organization_id=current_organization.id,
-        name=role.name,
-        description=role.description,
-    )
-
-    db.add(new_role)
-
     try:
-        db.commit()
+        return create_role_service(
+            db,
+            current_organization.id,
+            role.name,
+            role.description,
+        )
     except IntegrityError:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Role name already exists",
         )
 
-    db.refresh(new_role)
-
-    return new_role
 
 @router.get(
     "",
     response_model=list[RoleResponse],
 )
 async def list_roles(
-    current_user: User = Depends(
-        require_permission("ROLE_VIEW")
-    ),
+    current_user: User = Depends(require_permission("ROLE_VIEW")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    roles = db.scalars(
-        select(Role)
-        .where(Role.organization_id == current_organization.id)
-        .order_by(Role.id)
-    ).all()
+    return list_roles_service(
+        db,
+        current_organization.id,
+    )
 
-    return roles
 
 @router.get(
     "/{role_id}",
@@ -84,28 +75,22 @@ async def list_roles(
 )
 async def get_role(
     role_id: int,
-    current_user: User = Depends(
-        require_permission("ROLE_VIEW")
-    ),
-    current_organization: Organization = Depends(
-        get_current_organization
-    ),
+    current_user: User = Depends(require_permission("ROLE_VIEW")),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    role = db.scalar(
-        select(Role).where(
-            Role.id == role_id,
-            Role.organization_id == current_organization.id,
+    try:
+        return get_role_service(
+            db,
+            current_organization.id,
+            role_id,
         )
-    )
-
-    if role is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found",
+            detail=str(exc),
         )
 
-    return role
 
 @router.put(
     "/{role_id}",
@@ -114,47 +99,30 @@ async def get_role(
 async def update_role(
     role_id: int,
     role_data: RoleUpdate,
-    current_user: User = Depends(
-        require_permission("ROLE_UPDATE")
-    ),
+    current_user: User = Depends(require_permission("ROLE_UPDATE")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
-    
 ):
-    role = db.scalar(
-        select(Role).where(
-            Role.id == role_id,
-            Role.organization_id == current_organization.id,
+    try:
+        return update_role_service(
+            db,
+            current_organization.id,
+            role_id,
+            role_data.name,
+            role_data.description,
+            role_data.is_active,
         )
-    )
-
-    if role is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found",
+            detail=str(exc),
         )
-
-    if role_data.name is not None:
-        role.name = role_data.name
-
-    if role_data.description is not None:
-        role.description = role_data.description
-
-    if role_data.is_active is not None:
-        role.is_active = role_data.is_active
-
-    try:
-        db.commit()
     except IntegrityError:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Role name already exists",
         )
 
-    db.refresh(role)
-
-    return role
 
 @router.post(
     "/{role_id}/permissions/{permission_id}",
@@ -172,48 +140,28 @@ async def assign_permission_to_role(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    role = db.scalar(
-        select(Role).where(
-            Role.id == role_id,
-            Role.organization_id == current_organization.id,
+    try:
+        assign_permission_to_role_service(
+            db,
+            current_organization.id,
+            role_id,
+            permission_id,
         )
-    )
+    except ValueError as exc:
+        detail = str(exc)
 
-    if role is None:
+        if detail == "Role not found":
+            status_code = status.HTTP_404_NOT_FOUND
+        elif detail == "Permission not found":
+            status_code = status.HTTP_404_NOT_FOUND
+        else:
+            status_code = status.HTTP_409_CONFLICT
+
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found",
+            status_code=status_code,
+            detail=detail,
         )
 
-    permission = db.get(Permission, permission_id)
-
-    if permission is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Permission not found",
-        )
-
-    existing_assignment = db.execute(
-        select(role_permissions).where(
-            role_permissions.c.role_id == role_id,
-            role_permissions.c.permission_id == permission_id,
-        )
-    ).first()
-
-    if existing_assignment is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Permission already assigned to role",
-        )
-
-    db.execute(
-        role_permissions.insert().values(
-            role_id=role_id,
-            permission_id=permission_id,
-        )
-    )
-
-    db.commit()
 
 @router.get(
     "/{role_id}/permissions",
@@ -221,35 +169,22 @@ async def assign_permission_to_role(
 )
 async def list_role_permissions(
     role_id: int,
-    current_user: User = Depends(
-        require_permission("ROLE_VIEW")
-    ),    current_organization: Organization = Depends(get_current_organization),
+    current_user: User = Depends(require_permission("ROLE_VIEW")),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    role = db.scalar(
-        select(Role).where(
-            Role.id == role_id,
-            Role.organization_id == current_organization.id,
+    try:
+        return list_role_permissions_service(
+            db,
+            current_organization.id,
+            role_id,
         )
-    )
-
-    if role is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found",
+            detail=str(exc),
         )
 
-    permissions = db.scalars(
-        select(Permission)
-        .join(
-            role_permissions,
-            role_permissions.c.permission_id == Permission.id,
-        )
-        .where(role_permissions.c.role_id == role_id)
-        .order_by(Permission.id)
-    ).all()
-
-    return permissions
 
 @router.delete(
     "/{role_id}",
@@ -257,29 +192,22 @@ async def list_role_permissions(
 )
 async def delete_role(
     role_id: int,
-    current_user: User = Depends(
-        require_permission("ROLE_DELETE")
-    ),
-    current_organization: Organization = Depends(
-        get_current_organization
-    ),
+    current_user: User = Depends(require_permission("ROLE_DELETE")),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    role = db.scalar(
-        select(Role).where(
-            Role.id == role_id,
-            Role.organization_id == current_organization.id,
+    try:
+        delete_role_service(
+            db,
+            current_organization.id,
+            role_id,
         )
-    )
-
-    if role is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found",
+            detail=str(exc),
         )
 
-    db.delete(role)
-    db.commit()
 
 @router.delete(
     "/{role_id}/permissions/{permission_id}",
@@ -294,50 +222,18 @@ async def remove_permission_from_role(
             "ROLE_UPDATE",
         )
     ),
-    current_organization: Organization = Depends(
-        get_current_organization
-    ),
+    current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    role = db.scalar(
-        select(Role).where(
-            Role.id == role_id,
-            Role.organization_id == current_organization.id,
+    try:
+        remove_permission_from_role_service(
+            db,
+            current_organization.id,
+            role_id,
+            permission_id,
         )
-    )
-
-    if role is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found",
+            detail=str(exc),
         )
-
-    permission = db.get(Permission, permission_id)
-
-    if permission is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Permission not found",
-        )
-
-    existing_assignment = db.execute(
-        select(role_permissions).where(
-            role_permissions.c.role_id == role_id,
-            role_permissions.c.permission_id == permission_id,
-        )
-    ).first()
-
-    if existing_assignment is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Permission is not assigned to role",
-        )
-
-    db.execute(
-        role_permissions.delete().where(
-            role_permissions.c.role_id == role_id,
-            role_permissions.c.permission_id == permission_id,
-        )
-    )
-
-    db.commit()
