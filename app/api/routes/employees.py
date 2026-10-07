@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -11,10 +10,7 @@ from app.api.dependencies import (
 )
 from app.db.session import get_db
 from app.models.employee import Employee
-from app.models.branch import Branch
-from app.models.department import Department
 from app.models.organization import Organization
-from app.models.region import Region
 from app.models.user import User
 from app.schemas.employee import (
     EmployeeCreate,
