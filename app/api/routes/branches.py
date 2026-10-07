@@ -1,18 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_organization, get_current_user
 from app.db.session import get_db
-from app.models.branch import Branch
 from app.models.organization import Organization
-from app.models.region import Region
 from app.models.user import User
 from app.schemas.branch import (
     BranchCreate,
     BranchResponse,
-    BranchUpdate,
+)
+from app.services.branch_service import (
+    create_branch as create_branch_service,
+    get_branch as get_branch_service,
+    list_region_branches as list_region_branches_service,
 )
 
 
@@ -34,41 +35,24 @@ async def create_branch(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    region = db.scalar(
-        select(Region).where(
-            Region.id == region_id,
-            Region.organization_id == current_organization.id,
-            Region.is_active.is_(True),
+    try:
+        return create_branch_service(
+            db,
+            current_organization.id,
+            region_id,
+            branch.name,
+            branch.slug,
         )
-    )
-
-    if region is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Region not found",
+            detail=str(exc),
         )
-
-    new_branch = Branch(
-        organization_id=current_organization.id,
-        region_id=region_id,
-        name=branch.name,
-        slug=branch.slug,
-    )
-
-    db.add(new_branch)
-
-    try:
-        db.commit()
     except IntegrityError:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Branch slug already exists for this region",
         )
-
-    db.refresh(new_branch)
-
-    return new_branch
 
 
 @router.get(
@@ -81,20 +65,17 @@ async def get_branch(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    branch = db.scalar(
-        select(Branch).where(
-            Branch.id == branch_id,
-            Branch.organization_id == current_organization.id,
+    try:
+        return get_branch_service(
+            db,
+            current_organization.id,
+            branch_id,
         )
-    )
-
-    if branch is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Branch not found",
+            detail=str(exc),
         )
-
-    return branch
 
 
 @router.get(
@@ -107,27 +88,14 @@ async def list_branches(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    region = db.scalar(
-        select(Region).where(
-            Region.id == region_id,
-            Region.organization_id == current_organization.id,
-            Region.is_active.is_(True),
+    try:
+        return list_region_branches_service(
+            db,
+            current_organization.id,
+            region_id,
         )
-    )
-
-    if region is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Region not found",
+            detail=str(exc),
         )
-
-    branches = db.scalars(
-        select(Branch)
-        .where(
-            Branch.region_id == region_id,
-            Branch.organization_id == current_organization.id,
-        )
-        .order_by(Branch.id)
-    ).all()
-
-    return branches
