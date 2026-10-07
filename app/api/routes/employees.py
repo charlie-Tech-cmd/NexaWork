@@ -24,6 +24,7 @@ from app.schemas.employee import (
 from app.services.admin_employee_service import (
     create_employee as create_employee_service,
     get_employee as get_employee_service,
+    update_employee as update_employee_service,
 )
 
 router = APIRouter(
@@ -150,102 +151,27 @@ async def update_employee(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
-    employee = db.scalar(
-        select(Employee)
-        .join(Branch, Branch.id == Employee.branch_id)
-        .join(Region, Region.id == Branch.region_id)
-        .where(
-            Employee.id == employee_id,
-            Region.organization_id == current_organization.id,
-            Employee.organization_id == current_organization.id,
-            Region.is_active.is_(True),
-            Branch.is_active.is_(True),
-        )
-    )
-
-    if employee is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Employee not found",
-        )
-
-    department = db.scalar(
-        select(Department).where(
-            Department.id == employee.department_id,
-            Department.is_active.is_(True),
-        )
-    )
-
-    if department is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Employee not found",
-        )
-
-    if employee_data.branch_id is not None:
-        branch = db.scalar(
-            select(Branch)
-            .join(Region, Region.id == Branch.region_id)
-            .where(
-                Branch.id == employee_data.branch_id,
-                Region.organization_id == current_organization.id,
-                Region.is_active.is_(True),
-                Branch.is_active.is_(True),
-            )
-        )
-
-        if branch is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Branch not found",
-            )
-
-        employee.branch_id = employee_data.branch_id
-
-    if employee_data.department_id is not None:
-        target_branch_id = (
-            employee_data.branch_id
-            if employee_data.branch_id is not None
-            else employee.branch_id
-        )
-
-        department = db.scalar(
-            select(Department).where(
-                Department.id == employee_data.department_id,
-                Department.branch_id == target_branch_id,
-                Department.is_active.is_(True),
-            )
-        )
-
-        if department is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Department not found",
-            )
-
-        employee.department_id = employee_data.department_id
-
-    if employee_data.employee_id is not None:
-        employee.employee_id = employee_data.employee_id
-
-    if employee_data.job_title is not None:
-        employee.job_title = employee_data.job_title
-
-    if employee_data.profile_picture is not None:
-        employee.profile_picture = employee_data.profile_picture
-
-    if employee_data.is_active is not None:
-        employee.is_active = employee_data.is_active
-
     try:
-        db.commit()
+        return update_employee_service(
+            db=db,
+            organization_id=current_organization.id,
+            employee_id=employee_id,
+            employee_id_value=employee_data.employee_id,
+            branch_id=employee_data.branch_id,
+            department_id=employee_data.department_id,
+            job_title=employee_data.job_title,
+            profile_picture=employee_data.profile_picture,
+            is_active=employee_data.is_active,
+        )
+    except ValueError as exc:
+        status_code = status.HTTP_404_NOT_FOUND
+
+        raise HTTPException(
+            status_code=status_code,
+            detail=str(exc),
+        )
     except IntegrityError:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Employee ID or user is already assigned",
         )
-
-    db.refresh(employee)
-
-    return employee
