@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.models.organization import Organization
 from app.api.dependencies import (
     get_current_organization,
-    get_current_user,
     require_permission,
 )
 
