@@ -1,11 +1,42 @@
 from app.core.security.password import hash_password
 from app.models.branch import Branch
 from app.models.organization import Organization
+from app.models.permission import Permission
 from app.models.region import Region
+from app.models.role import Role
+from app.models.role_permission import role_permissions
 from app.models.user import User
+from app.models.user_role import user_roles
 from sqlalchemy import select
 
 
+def grant_permission(db_session, user, permission_name):
+    permission = Permission(
+        name=permission_name,
+        description=f"{permission_name} test permission",
+    )
+    db_session.add(permission)
+    db_session.flush()
+    role = Role(
+        organization_id=user.organization_id,
+        name=f"{permission_name} Test Role",
+        description=f"Test role for {permission_name}",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
 def test_get_branch_rejects_another_organization(
     client,
     db_session,
@@ -20,7 +51,6 @@ def test_get_branch_rejects_another_organization(
     )
     db_session.add_all([organization_a, organization_b])
     db_session.flush()
-
     region_b = Region(
         organization_id=organization_b.id,
         name="Organization B Region",
@@ -28,16 +58,13 @@ def test_get_branch_rejects_another_organization(
     )
     db_session.add(region_b)
     db_session.flush()
-
     branch_b = Branch(
         organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
-
     db_session.add(branch_b)
-
     user_a = User(
         organization_id=organization_a.id,
         email="branch.api.a@example.com",
@@ -46,6 +73,7 @@ def test_get_branch_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+    grant_permission(db_session, user_a, "BRANCH_VIEW")
     db_session.commit()
 
     login_response = client.post(
@@ -79,7 +107,6 @@ def test_get_branch_allows_current_organization(
     )
     db_session.add(organization)
     db_session.flush()
-
     region = Region(
         organization_id=organization.id,
         name="Current Organization Region",
@@ -87,7 +114,6 @@ def test_get_branch_allows_current_organization(
     )
     db_session.add(region)
     db_session.flush()
-
     branch = Branch(
         organization_id=organization.id,
         region_id=region.id,
@@ -95,7 +121,6 @@ def test_get_branch_allows_current_organization(
         slug="current-organization-branch",
     )
     db_session.add(branch)
-
     user = User(
         organization_id=organization.id,
         email="current.branch@example.com",
@@ -104,6 +129,8 @@ def test_get_branch_allows_current_organization(
         is_active=True,
     )
     db_session.add(user)
+    db_session.flush()
+    grant_permission(db_session, user, "BRANCH_VIEW")
     db_session.commit()
 
     login_response = client.post(
@@ -150,7 +177,6 @@ def test_list_branches_rejects_another_organization(
     )
     db_session.add_all([organization_a, organization_b])
     db_session.flush()
-
     region_b = Region(
         organization_id=organization_b.id,
         name="Organization B Region",
@@ -158,16 +184,13 @@ def test_list_branches_rejects_another_organization(
     )
     db_session.add(region_b)
     db_session.flush()
-
     branch_b = Branch(
         organization_id=organization_b.id,
         region_id=region_b.id,
         name="Organization B Branch",
         slug="organization-b-branch",
     )
-
     db_session.add(branch_b)
-
     user_a = User(
         organization_id=organization_a.id,
         email="branch.list.a@example.com",
@@ -176,6 +199,7 @@ def test_list_branches_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+    grant_permission(db_session, user_a, "BRANCH_VIEW")
     db_session.commit()
 
     login_response = client.post(
@@ -213,14 +237,12 @@ def test_create_branch_rejects_another_organization(
     )
     db_session.add_all([organization_a, organization_b])
     db_session.flush()
-
     region_b = Region(
         organization_id=organization_b.id,
         name="Organization B Region",
         slug="organization-b-region",
     )
     db_session.add(region_b)
-
     user_a = User(
         organization_id=organization_a.id,
         email="branch.create.a@example.com",
@@ -229,6 +251,7 @@ def test_create_branch_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+    grant_permission(db_session, user_a, "BRANCH_CREATE")
     db_session.commit()
 
     login_response = client.post(
@@ -272,7 +295,6 @@ def test_create_branch_rejects_inactive_region(
     )
     db_session.add(organization)
     db_session.flush()
-
     region = Region(
         organization_id=organization.id,
         name="Inactive Region",
@@ -280,7 +302,6 @@ def test_create_branch_rejects_inactive_region(
         is_active=False,
     )
     db_session.add(region)
-
     user = User(
         organization_id=organization.id,
         email="inactive.region.create@example.com",
@@ -289,6 +310,7 @@ def test_create_branch_rejects_inactive_region(
         is_active=True,
     )
     db_session.add(user)
+    grant_permission(db_session, user, "BRANCH_CREATE")
     db_session.commit()
 
     login_response = client.post(
@@ -332,7 +354,6 @@ def test_list_branches_rejects_inactive_region(
     )
     db_session.add(organization)
     db_session.flush()
-
     region = Region(
         organization_id=organization.id,
         name="Inactive Region",
@@ -341,7 +362,6 @@ def test_list_branches_rejects_inactive_region(
     )
     db_session.add(region)
     db_session.flush()
-
     branch = Branch(
         organization_id=organization.id,
         region_id=region.id,
@@ -349,7 +369,6 @@ def test_list_branches_rejects_inactive_region(
         slug="inactive-region-branch",
     )
     db_session.add(branch)
-
     user = User(
         organization_id=organization.id,
         email="inactive.region.list@example.com",
@@ -358,6 +377,7 @@ def test_list_branches_rejects_inactive_region(
         is_active=True,
     )
     db_session.add(user)
+    grant_permission(db_session, user, "BRANCH_VIEW")
     db_session.commit()
 
     login_response = client.post(

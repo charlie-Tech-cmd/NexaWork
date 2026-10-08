@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_organization, get_current_user
+from app.api.dependencies import get_current_organization, require_permission
 from app.db.session import get_db
 from app.models.organization import Organization
 from app.models.user import User
@@ -31,7 +31,7 @@ router = APIRouter(
 async def create_branch(
     region_id: int,
     branch: BranchCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("BRANCH_CREATE")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -61,7 +61,7 @@ async def create_branch(
 )
 async def get_branch(
     branch_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("BRANCH_VIEW")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -84,7 +84,7 @@ async def get_branch(
 )
 async def list_branches(
     region_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("BRANCH_VIEW")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
