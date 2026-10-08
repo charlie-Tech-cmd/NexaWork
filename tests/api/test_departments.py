@@ -1,11 +1,47 @@
 from app.core.security.password import hash_password
+from sqlalchemy import select
+
 from app.models.branch import Branch
 from app.models.department import Department
 from app.models.organization import Organization
+from app.models.permission import Permission
 from app.models.region import Region
+from app.models.role import Role
+from app.models.role_permission import role_permissions
 from app.models.user import User
-from sqlalchemy import select
+from app.models.user_role import user_roles
 
+
+def grant_permission(db_session, user, permission_name):
+    permission = Permission(
+        name=permission_name,
+        description=f"{permission_name} test permission",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=user.organization_id,
+        name=f"{permission_name} Test Role",
+        description=f"Test role for {permission_name}",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
 
 def test_get_department_rejects_another_organization(
     client,
@@ -54,6 +90,8 @@ def test_get_department_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+    db_session.flush()
+    grant_permission(db_session, user_a, "DEPARTMENT_VIEW")
     db_session.commit()
 
     login_response = client.post(
@@ -120,6 +158,8 @@ def test_get_department_allows_current_organization(
         is_active=True,
     )
     db_session.add(user)
+    db_session.flush()
+    grant_permission(db_session, user, "DEPARTMENT_VIEW")
     db_session.commit()
 
     login_response = client.post(
@@ -191,6 +231,8 @@ def test_list_departments_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+    db_session.flush()
+    grant_permission(db_session, user_a, "DEPARTMENT_VIEW")
     db_session.commit()
 
     login_response = client.post(
@@ -253,6 +295,8 @@ def test_create_department_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+    db_session.flush()
+    grant_permission(db_session, user_a, "DEPARTMENT_CREATE")
     db_session.commit()
 
     login_response = client.post(
@@ -331,6 +375,9 @@ def test_get_department_rejects_inactive_region(
         is_active=True,
     )
     db_session.add(user)
+    db_session.flush()
+
+    grant_permission(db_session, user, "DEPARTMENT_VIEW")
     db_session.commit()
 
     login_response = client.post(
@@ -398,6 +445,8 @@ def test_list_departments_rejects_inactive_branch(
         is_active=True,
     )
     db_session.add(user)
+    db_session.flush()
+    grant_permission(db_session, user, "DEPARTMENT_VIEW")
     db_session.commit()
 
     login_response = client.post(
@@ -457,6 +506,8 @@ def test_create_department_rejects_inactive_branch(
         is_active=True,
     )
     db_session.add(user)
+    db_session.flush()
+    grant_permission(db_session, user, "DEPARTMENT_CREATE")
     db_session.commit()
 
     login_response = client.post(

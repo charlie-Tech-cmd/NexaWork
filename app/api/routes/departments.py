@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_organization, get_current_user
+from app.api.dependencies import get_current_organization, require_permission
 from app.db.session import get_db
 from app.models.organization import Organization
 from app.models.user import User
@@ -33,7 +33,7 @@ async def create_department(
     branch_id: int,
     department: DepartmentCreate,
     current_organization: Organization = Depends(get_current_organization),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("DEPARTMENT_CREATE")),
     db: Session = Depends(get_db),
 ):
     try:
@@ -63,7 +63,7 @@ async def create_department(
 async def get_department(
     department_id: int,
     current_organization: Organization = Depends(get_current_organization),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("DEPARTMENT_VIEW")),
     db: Session = Depends(get_db),
 ):
     try:
@@ -86,7 +86,7 @@ async def get_department(
 async def list_departments(
     branch_id: int,
     current_organization: Organization = Depends(get_current_organization),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("DEPARTMENT_VIEW")),
     db: Session = Depends(get_db),
 ):
     try:
@@ -110,7 +110,7 @@ async def update_department(
     department_id: int,
     department_data: DepartmentUpdate,
     current_organization: Organization = Depends(get_current_organization),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("DEPARTMENT_UPDATE")),
     db: Session = Depends(get_db),
 ):
     try:
