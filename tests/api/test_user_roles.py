@@ -322,3 +322,179 @@ def test_assign_role_to_user_allows_user_with_update_permission(
     ).first()
 
     assert assignment is not None
+
+
+def test_list_user_roles_rejects_user_without_view_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="List User Roles Security Organization",
+        slug="list-user-roles-security-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    permission = Permission(
+        name="USER_UPDATE",
+        description="Update users",
+        is_active=True,
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="User Updater",
+        description="Can update users",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="list.user.roles.security@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="List User Roles Security Test",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "list.user.roles.security@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/users/{user.id}/roles",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Permission denied",
+    }
+
+
+def test_list_user_roles_allows_user_with_view_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="List User Roles Permission Organization",
+        slug="list-user-roles-permission-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    permission = Permission(
+        name="USER_VIEW",
+        description="View users",
+        is_active=True,
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    permission_role = Role(
+        organization_id=organization.id,
+        name="User Viewer",
+        description="Role granting view permission",
+        is_active=True,
+    )
+    db_session.add(permission_role)
+    db_session.flush()
+
+    target_role = Role(
+        organization_id=organization.id,
+        name="Assignable Role",
+        description="Role assigned to the user",
+        is_active=True,
+    )
+    db_session.add(target_role)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="list.user.roles.permission@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="List User Roles Permission Test",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=permission_role.id,
+            permission_id=permission.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=permission_role.id,
+        )
+    )
+
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=target_role.id,
+        )
+    )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "list.user.roles.permission@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/api/v1/users/{user.id}/roles",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+
+    roles = response.json()
+
+    assert len(roles) == 2
+    assert {role["id"] for role in roles} == {
+        permission_role.id,
+        target_role.id,
+    }
+

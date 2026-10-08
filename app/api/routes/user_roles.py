@@ -87,7 +87,7 @@ async def assign_role_to_user(
 )
 async def list_user_roles(
     user_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("USER_VIEW")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
