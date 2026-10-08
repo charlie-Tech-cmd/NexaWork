@@ -1246,3 +1246,17 @@ def test_forgot_password_email_token_can_reset_password(
         user.password_hash,
     )
     assert user.token_version == 1
+
+
+def test_public_registration_endpoint_is_removed(client):
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "register.test@example.com",
+            "password": "SecurePassword123!",
+            "confirm_password": "SecurePassword123!",
+            "full_name": "Registration Test User",
+        },
+    )
+
+    assert response.status_code == 404
