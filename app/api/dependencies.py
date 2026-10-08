@@ -165,6 +165,7 @@ def get_current_super_admin(
 
     return db_user
 
+
 def get_current_employee(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -172,18 +173,16 @@ def get_current_employee(
     employee = db.scalar(
         select(Employee).where(
             Employee.user_id == current_user.id,
+            Employee.organization_id == current_user.organization_id,
             Employee.is_active.is_(True),
         )
     )
-
     if employee is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Employee access required",
         )
-
     return employee
-
 
 def get_current_organization(
     current_user: User = Depends(get_current_user),

@@ -125,3 +125,71 @@ def test_get_current_employee_rejects_user_without_employee(db_session):
         assert exc.detail == "Employee access required"
     else:
         raise AssertionError("Expected employee access to be rejected")
+
+
+def test_get_current_employee_rejects_mismatched_organization(db_session):
+    organization_a = Organization(
+        name="Employee Access Organization A",
+        slug="employee-access-organization-a",
+    )
+    organization_b = Organization(
+        name="Employee Access Organization B",
+        slug="employee-access-organization-b",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    region_b = Region(
+        organization_id=organization_b.id,
+        name="Employee Access Region B",
+        slug="employee-access-region-b",
+    )
+    db_session.add(region_b)
+    db_session.flush()
+
+    branch_b = Branch(
+        organization_id=organization_b.id,
+        region_id=region_b.id,
+        name="Employee Access Branch B",
+        slug="employee-access-branch-b",
+    )
+    db_session.add(branch_b)
+    db_session.flush()
+
+    department_b = Department(
+        branch_id=branch_b.id,
+        name="Employee Access Department B",
+        slug="employee-access-department-b",
+    )
+    db_session.add(department_b)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization_a.id,
+        email="employee.mismatch@example.com",
+        password_hash="test-hash",
+        full_name="Employee Mismatch User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    employee = Employee(
+        organization_id=organization_b.id,
+        user_id=user.id,
+        employee_id="EMP-MISMATCH-001",
+        branch_id=branch_b.id,
+        department_id=department_b.id,
+        job_title="Developer",
+        is_active=True,
+    )
+    db_session.add(employee)
+    db_session.commit()
+
+    try:
+        get_current_employee(current_user=user, db=db_session)
+    except Exception as exc:
+        assert exc.status_code == 403
+        assert exc.detail == "Employee access required"
+    else:
+        raise AssertionError("Expected employee access to be rejected")
