@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -9,10 +9,18 @@ from app.db.base import Base
 class Role(Base):
     __tablename__ = "roles"
 
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "name",
+            name="uq_roles_organization_name",
+        ),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True)
 
     organization_id: Mapped[int] = mapped_column(
-        ForeignKey("organizations.id"),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
