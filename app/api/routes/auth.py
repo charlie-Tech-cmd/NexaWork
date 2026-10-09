@@ -8,6 +8,7 @@ from app.core.security.password import hash_password, verify_password
 from app.core.security.jwt import create_access_token
 from app.core.rate_limit import (
     is_login_allowed,
+    is_login_ip_allowed,
     is_password_recovery_allowed,
 )
 from app.db.session import get_db
@@ -46,7 +47,12 @@ async def login_user(
 
     login_key = f"login:{request.client.host}:{user.email.lower()}"
 
-    if not is_login_allowed(login_key):
+    login_ip_key = f"login-ip:{request.client.host}"
+
+    identity_allowed = is_login_allowed(login_key)
+    ip_allowed = is_login_ip_allowed(login_ip_key)
+
+    if not identity_allowed or not ip_allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts. Please try again later.",
@@ -181,7 +187,12 @@ async def employee_login(
         f"{employee_login.employee_id.lower()}"
     )
 
-    if not is_login_allowed(login_key):
+    login_ip_key = f"login-ip:{request.client.host}"
+
+    identity_allowed = is_login_allowed(login_key)
+    ip_allowed = is_login_ip_allowed(login_ip_key)
+
+    if not identity_allowed or not ip_allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts. Please try again later.",
@@ -271,7 +282,12 @@ async def admin_login(
         f"{admin_login.email.lower()}"
     )
 
-    if not is_login_allowed(login_key):
+    login_ip_key = f"login-ip:{request.client.host}"
+
+    identity_allowed = is_login_allowed(login_key)
+    ip_allowed = is_login_ip_allowed(login_ip_key)
+
+    if not identity_allowed or not ip_allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts. Please try again later.",
@@ -368,7 +384,12 @@ async def super_admin_login(
         f"{super_admin_login.email.lower()}"
     )
 
-    if not is_login_allowed(login_key):
+    login_ip_key = f"login-ip:{request.client.host}"
+
+    identity_allowed = is_login_allowed(login_key)
+    ip_allowed = is_login_ip_allowed(login_ip_key)
+
+    if not identity_allowed or not ip_allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts. Please try again later.",

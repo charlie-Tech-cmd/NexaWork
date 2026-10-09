@@ -55,8 +55,12 @@ def client(db_session: Session, email_service: FakeEmailService):
         "app.api.routes.auth.is_login_allowed",
         return_value=True,
     ):
-        with TestClient(app) as test_client:
-            yield test_client
+        with patch(
+            "app.api.routes.auth.is_login_ip_allowed",
+            return_value=True,
+        ):
+            with TestClient(app) as test_client:
+                yield test_client
 
     app.dependency_overrides.clear()
 

@@ -589,6 +589,30 @@ def test_login_rejects_rate_limited_request(client):
         "Too many login attempts. Please try again later."
     )
 
+
+def test_login_rejects_ip_rate_limited_request(client):
+    with patch(
+        "app.api.routes.auth.is_login_allowed",
+        return_value=True,
+    ):
+        with patch(
+            "app.api.routes.auth.is_login_ip_allowed",
+            return_value=False,
+        ):
+            response = client.post(
+                "/api/v1/auth/login",
+                json={
+                    "email": "ip-blocked@example.com",
+                    "password": "SecurePassword123!",
+                },
+            )
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == (
+        "Too many login attempts. Please try again later."
+    )
+
+
 def test_employee_login_rejects_rate_limited_request(client):
     with patch(
         "app.api.routes.auth.is_login_allowed",

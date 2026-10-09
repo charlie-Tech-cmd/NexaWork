@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     rate_limit_max_attempts: int = 5
     rate_limit_window_seconds: int = 60
+    rate_limit_ip_max_attempts: int = 30
+    rate_limit_ip_window_seconds: int = 60
 
     @property
     def cors_origin_list(self) -> list[str]:

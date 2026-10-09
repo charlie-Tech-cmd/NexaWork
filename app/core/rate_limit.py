@@ -10,6 +10,14 @@ def is_login_allowed(key: str) -> bool:
     )
 
 
+def is_login_ip_allowed(key: str) -> bool:
+    return check_rate_limit(
+        key,
+        settings.rate_limit_ip_max_attempts,
+        settings.rate_limit_ip_window_seconds,
+    )
+
+
 def is_password_recovery_allowed(key: str) -> bool:
     return check_rate_limit(
         key,
