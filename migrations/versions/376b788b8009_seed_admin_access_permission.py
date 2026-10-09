@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "new_revision_id"
+revision = "376b788b8009"
 down_revision = "8c65456d9446"
 
 

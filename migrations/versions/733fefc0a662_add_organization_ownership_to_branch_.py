@@ -1,7 +1,7 @@
 """add organization ownership to branch department employee
 
 Revision ID: 733fefc0a662
-Revises: new_revision_id
+Revises: 376b788b8009
 Create Date: 2026-09-26 03:40:34.597411
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '733fefc0a662'
-down_revision: Union[str, Sequence[str], None] = 'new_revision_id'
+down_revision: Union[str, Sequence[str], None] = '376b788b8009'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
