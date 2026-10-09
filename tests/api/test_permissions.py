@@ -54,10 +54,10 @@ def test_update_permission_rejects_user_without_update_permission(
 
     assert response.status_code == 403
     assert response.json() == {
-        "detail": "Permission denied",
+        "detail": "Super Admin authentication required",
     }
 
-def test_update_permission_allows_user_with_update_permission(
+def test_update_permission_rejects_org_user_with_update_permission(
     client,
     db_session,
 ):
@@ -134,8 +134,14 @@ def test_update_permission_allows_user_with_update_permission(
         },
     )
 
-    assert response.status_code == 200
-    assert response.json()["description"] == "Updated description"
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Super Admin authentication required",
+    }
+    db_session.expire_all()
+    assert db_session.get(Permission, permission.id).description == (
+        "Original description"
+    )
 
 def test_create_permission_rejects_user_without_create_permission(
     client,
@@ -179,10 +185,10 @@ def test_create_permission_rejects_user_without_create_permission(
 
     assert response.status_code == 403
     assert response.json() == {
-        "detail": "Permission denied",
+        "detail": "Super Admin authentication required",
     }
 
-def test_create_permission_allows_user_with_create_permission(
+def test_create_permission_rejects_org_user_with_create_permission(
     client,
     db_session,
 ):
@@ -254,9 +260,13 @@ def test_create_permission_allows_user_with_create_permission(
         },
     )
 
-    assert response.status_code == 201
-    assert response.json()["name"] == "REPORT_VIEW"
-    assert response.json()["description"] == "View reports"
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Super Admin authentication required",
+    }
+    assert db_session.query(Permission).filter_by(
+        name="REPORT_VIEW"
+    ).first() is None
 
 def test_delete_permission_rejects_user_without_delete_permission(
     client,
@@ -302,10 +312,10 @@ def test_delete_permission_rejects_user_without_delete_permission(
 
     assert response.status_code == 403
     assert response.json() == {
-        "detail": "Permission denied",
+        "detail": "Super Admin authentication required",
     }
 
-def test_delete_permission_allows_user_with_delete_permission(
+def test_delete_permission_rejects_org_user_with_delete_permission(
     client,
     db_session,
 ):
@@ -357,6 +367,12 @@ def test_delete_permission_allows_user_with_delete_permission(
             permission_id=delete_permission.id,
         )
     )
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
 
     db_session.execute(
         user_roles.insert().values(
@@ -382,10 +398,70 @@ def test_delete_permission_allows_user_with_delete_permission(
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
-    assert response.status_code == 204
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Super Admin authentication required",
+    }
 
-    assert db_session.get(
-        Permission,
-        permission.id,
-    ) is None                  
+    db_session.expire_all()
+    assert db_session.get(Permission, permission.id) is not None
+    assignment = db_session.execute(
+        role_permissions.select().where(
+            role_permissions.c.role_id == role.id,
+            role_permissions.c.permission_id == permission.id,
+        )
+    ).first()
+    assert assignment is not None
+
+def test_super_admin_can_create_update_and_delete_permissions(
+    client,
+    db_session,
+):
+    super_admin = User(
+        organization_id=None,
+        email="permission.superadmin@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Permission Super Admin",
+        is_active=True,
+        is_super_admin=True,
+    )
+    db_session.add(super_admin)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": "permission.superadmin@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+    access_token = login_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    create_response = client.post(
+        "/api/v1/permissions",
+        headers=headers,
+        json={
+            "name": "SUPER_ADMIN_TEST_PERMISSION",
+            "description": "Created by Super Admin",
+        },
+    )
+    assert create_response.status_code == 201
+    permission_id = create_response.json()["id"]
+
+    update_response = client.put(
+        f"/api/v1/permissions/{permission_id}",
+        headers=headers,
+        json={"description": "Updated by Super Admin"},
+    )
+    assert update_response.status_code == 200
+    assert update_response.json()["description"] == "Updated by Super Admin"
+
+    delete_response = client.delete(
+        f"/api/v1/permissions/{permission_id}",
+        headers=headers,
+    )
+    assert delete_response.status_code == 204
+    assert db_session.get(Permission, permission_id) is None
 
