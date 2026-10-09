@@ -39,5 +39,8 @@ jobs:
           python -m pip_audit --strict -r requirements.txt
 
       - name: Run test suite
+        env:
+          ENVIRONMENT: test
+          JWT_SECRET_KEY: ci-only-test-secret-not-for-production
         run: |
           python -m pytest -q
