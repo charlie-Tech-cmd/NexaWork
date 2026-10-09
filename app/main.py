@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from app.core.rate_limit import RateLimitUnavailable
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
 from app.api.routes.organizations import router as organizations_router
@@ -24,6 +26,20 @@ from app.core.middleware import (
 configure_logging()
 
 app = FastAPI(title=f"{settings.app_name} API")
+
+
+@app.exception_handler(RateLimitUnavailable)
+async def rate_limit_unavailable_handler(request, exc):
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": (
+                "Authentication is temporarily unavailable. "
+                "Please try again later."
+            ),
+        },
+    )
+
 
 app.add_middleware(
     CORSMiddleware,

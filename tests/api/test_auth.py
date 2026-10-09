@@ -1,7 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+import redis
+
 import jwt
 
+from app.core.rate_limit import RateLimitUnavailable, is_login_allowed
 from app.core.config import settings
 from app.core.security.password import hash_password, verify_password
 from app.core.security.reset_token import hash_reset_token
@@ -648,6 +652,122 @@ def test_admin_login_rejects_rate_limited_request(client):
     assert response.json()["detail"] == (
         "Too many login attempts. Please try again later."
     )
+
+
+@pytest.mark.parametrize(
+    ("path", "payload", "patch_target"),
+    [
+        (
+            "/api/v1/auth/login",
+            {
+                "email": "outage@example.com",
+                "password": "SecurePassword123!",
+            },
+            "is_login_allowed",
+        ),
+        (
+            "/api/v1/auth/employee/login",
+            {
+                "employee_id": "EMP001",
+                "password": "SecurePassword123!",
+            },
+            "is_login_allowed",
+        ),
+        (
+            "/api/v1/auth/admin/login",
+            {
+                "email": "admin-outage@example.com",
+                "password": "SecurePassword123!",
+            },
+            "is_login_allowed",
+        ),
+        (
+            "/api/v1/auth/super-admin/login",
+            {
+                "email": "super-admin-outage@example.com",
+                "password": "SecurePassword123!",
+            },
+            "is_login_allowed",
+        ),
+        (
+            "/api/v1/auth/forgot-password",
+            {"email": "recovery-outage@example.com"},
+            "is_password_recovery_allowed",
+        ),
+    ],
+)
+
+def test_auth_rate_limit_redis_failure_returns_503(
+    client,
+    path,
+    payload,
+    patch_target,
+):
+    with patch(
+        f"app.api.routes.auth.{patch_target}",
+        side_effect=RateLimitUnavailable(),
+    ):
+        response = client.post(path, json=payload)
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": (
+            "Authentication is temporarily unavailable. "
+            "Please try again later."
+        ),
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "payload"),
+    [
+        (
+            "/api/v1/auth/login",
+            {"email": "ip-outage@example.com", "password": "SecurePassword123!"},
+        ),
+        (
+            "/api/v1/auth/employee/login",
+            {"employee_id": "EMP-IP-001", "password": "SecurePassword123!"},
+        ),
+        (
+            "/api/v1/auth/admin/login",
+            {"email": "admin-ip-outage@example.com", "password": "SecurePassword123!"},
+        ),
+        (
+            "/api/v1/auth/super-admin/login",
+            {"email": "super-admin-ip-outage@example.com", "password": "SecurePassword123!"},
+        ),
+    ],
+)
+def test_login_ip_rate_limit_redis_failure_returns_503(client, path, payload):
+    with (
+        patch(
+            "app.api.routes.auth.is_login_allowed",
+            return_value=True,
+        ),
+        patch(
+            "app.api.routes.auth.is_login_ip_allowed",
+            side_effect=RateLimitUnavailable(),
+        ),
+    ):
+        response = client.post(path, json=payload)
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": (
+            "Authentication is temporarily unavailable. "
+            "Please try again later."
+        ),
+    }
+
+
+def test_rate_limit_wraps_redis_error():
+    with patch(
+        "app.core.rate_limit.check_rate_limit",
+        side_effect=redis.exceptions.RedisError("Redis unavailable"),
+    ):
+        with pytest.raises(RateLimitUnavailable):
+            is_login_allowed("rate-limit-test")
 
 
 def test_login_rejects_inactive_organization(client, db_session):
