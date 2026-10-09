@@ -30,6 +30,7 @@ def test_valid_production_settings_are_accepted():
     [
         ({"db_host": "localhost"}, "DB_HOST"),
         ({"db_password": "postgres"}, "DB_PASSWORD"),
+        ({"db_password": ""}, "DB_PASSWORD"),
         ({"jwt_secret_key": "change-me"}, "JWT_SECRET_KEY"),
         (
             {"password_reset_url": "http://localhost:3000/reset-password"},
