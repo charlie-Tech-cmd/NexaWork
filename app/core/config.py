@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
@@ -17,7 +18,7 @@ class Settings(BaseSettings):
             origin.strip()
             for origin in self.cors_origins.split(",")
             if origin.strip()
-    ]
+        ]
 
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
@@ -42,6 +43,67 @@ class Settings(BaseSettings):
             port=self.db_port,
             database=self.db_name,
         )
+
+    @model_validator(mode="after")
+    def validate_production_settings(self):
+        if self.environment.strip().lower() != "production":
+            return self
+
+        errors = []
+
+        if self.db_host.strip().lower() in {
+            "localhost",
+            "127.0.0.1",
+            "::1",
+        }:
+            errors.append(
+                "DB_HOST must not point to localhost in production"
+            )
+
+        if self.db_password.strip().lower() in {
+            "",
+            "postgres",
+            "change-me",
+        }:
+            errors.append(
+                "DB_PASSWORD must be explicitly configured in production"
+            )
+
+        if self.jwt_secret_key.strip().lower() in {
+            "",
+            "change-me",
+            "secret",
+            "your-secret-key",
+            "replace-with-a-long-random-secret",
+        }:
+            errors.append(
+                "JWT_SECRET_KEY must not use a placeholder in production"
+            )
+
+        reset_url = self.password_reset_url.strip().lower()
+        if not reset_url.startswith("https://"):
+            errors.append(
+                "PASSWORD_RESET_URL must use HTTPS in production"
+            )
+
+        origins = self.cors_origin_list
+        if not origins:
+            errors.append(
+                "CORS_ORIGINS must contain at least one origin in production"
+            )
+
+        if any(
+            origin == "*" or not origin.lower().startswith("https://")
+            for origin in origins
+        ):
+            errors.append(
+                "CORS_ORIGINS must contain explicit HTTPS origins in production"
+            )
+
+        if errors:
+            raise ValueError("; ".join(errors))
+
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",
