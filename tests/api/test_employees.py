@@ -11,6 +11,7 @@ from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
 from app.models.region import Region
 from app.models.user import User
+from app.services.admin_employee_service import update_employee
 from sqlalchemy import select
 
 
@@ -2623,3 +2624,91 @@ def test_update_employee_rejects_inactive_target_department(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Department not found"}
+
+
+def test_update_employee_requires_department_when_changing_branches(
+    db_session,
+):
+    organization = Organization(
+        name="Branch Change Organization",
+        slug="branch-change-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Branch Change Region",
+        slug="branch-change-region",
+        is_active=True,
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    current_branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Current Branch",
+        slug="branch-change-current",
+        is_active=True,
+    )
+    target_branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Target Branch",
+        slug="branch-change-target",
+        is_active=True,
+    )
+    db_session.add_all([current_branch, target_branch])
+    db_session.flush()
+
+    current_department = Department(
+        branch_id=current_branch.id,
+        name="Current Department",
+        slug="branch-change-current-department",
+        is_active=True,
+    )
+    db_session.add(current_department)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="branch.change.employee@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Branch Change Employee",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id="EMP-BRANCH-CHANGE-001",
+        branch_id=current_branch.id,
+        department_id=current_department.id,
+        job_title="Developer",
+        is_active=True,
+    )
+    db_session.add(employee)
+    db_session.commit()
+
+    with pytest.raises(
+        ValueError,
+        match="Department must be provided when changing branches",
+    ):
+        update_employee(
+            db=db_session,
+            organization_id=organization.id,
+            employee_id=employee.id,
+            employee_id_value=None,
+            branch_id=target_branch.id,
+            department_id=None,
+            job_title=None,
+            profile_picture=None,
+            is_active=None,
+        )
+
+    db_session.refresh(employee)
+    assert employee.branch_id == current_branch.id
+    assert employee.department_id == current_department.id

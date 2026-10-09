@@ -132,6 +132,7 @@ def update_employee(
     department = db.scalar(
         select(Department).where(
             Department.id == employee.department_id,
+            Department.branch_id == employee.branch_id,
             Department.is_active.is_(True),
         )
     )
@@ -153,6 +154,11 @@ def update_employee(
 
         if branch is None:
             raise ValueError("Branch not found")
+
+        if branch_id != employee.branch_id and department_id is None:
+            raise ValueError(
+                "Department must be provided when changing branches"
+            )
 
         employee.branch_id = branch_id
 

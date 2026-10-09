@@ -1,3 +1,5 @@
+import pytest
+
 from app.core.security.password import hash_password
 from app.models.organization import Organization
 from app.models.permission import Permission
@@ -5,7 +7,6 @@ from app.models.role import Role
 from app.models.role_permission import role_permissions
 from app.models.user import User
 from app.models.user_role import user_roles
-from app.models.role import Role
 
 
 def test_create_role_rejects_user_without_create_permission(
@@ -1077,4 +1078,121 @@ def test_remove_permission_from_role_allows_user_with_permission(
         },
     )
 
-    assert response.status_code == 204                                        
+    assert response.status_code == 204
+
+
+@pytest.mark.parametrize("action", ["assign", "remove"])
+def test_permission_changes_reject_role_from_another_organization(
+    client,
+    db_session,
+    action,
+):
+    organization_a = Organization(
+        name="Permission Manager Organization",
+        slug=f"permission-manager-{action}",
+    )
+    organization_b = Organization(
+        name="Protected Target Organization",
+        slug=f"permission-target-{action}",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    update_permission = Permission(
+        name="ROLE_UPDATE",
+        description="Update roles",
+        is_active=True,
+    )
+    target_permission = Permission(
+        name=f"CROSS_ORG_TEST_{action.upper()}",
+        description="Permission used for cross-organization test",
+        is_active=True,
+    )
+    manager_role = Role(
+        organization_id=organization_a.id,
+        name="Permission Manager",
+        description="Can update roles",
+        is_active=True,
+    )
+    target_role = Role(
+        organization_id=organization_b.id,
+        name="Protected Role",
+        description="Belongs to another organization",
+        is_active=True,
+    )
+    user = User(
+        organization_id=organization_a.id,
+        email=f"cross.org.permission.{action}@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Permission Manager",
+        is_active=True,
+    )
+    db_session.add_all(
+        [
+            update_permission,
+            target_permission,
+            manager_role,
+            target_role,
+            user,
+        ]
+    )
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=manager_role.id,
+            permission_id=update_permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=manager_role.id,
+        )
+    )
+
+    if action == "remove":
+        db_session.execute(
+            role_permissions.insert().values(
+                role_id=target_role.id,
+                permission_id=target_permission.id,
+            )
+        )
+
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+    token = login_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    endpoint = (
+        f"/api/v1/roles/{target_role.id}/permissions/"
+        f"{target_permission.id}"
+    )
+
+    if action == "assign":
+        response = client.post(endpoint, headers=headers)
+    else:
+        response = client.delete(endpoint, headers=headers)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Role not found"}
+
+    assignment = db_session.execute(
+        role_permissions.select().where(
+            role_permissions.c.role_id == target_role.id,
+            role_permissions.c.permission_id == target_permission.id,
+        )
+    ).first()
+
+    if action == "assign":
+        assert assignment is None
+    else:
+        assert assignment is not None

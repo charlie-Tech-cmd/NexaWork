@@ -143,11 +143,16 @@ async def update_employee(
             is_active=employee_data.is_active,
         )
     except ValueError as exc:
-        status_code = status.HTTP_404_NOT_FOUND
+        detail = str(exc)
+        status_code = (
+            status.HTTP_422_UNPROCESSABLE_ENTITY
+            if detail == "Department must be provided when changing branches"
+            else status.HTTP_404_NOT_FOUND
+        )
 
         raise HTTPException(
             status_code=status_code,
-            detail=str(exc),
+            detail=detail,
         )
     except IntegrityError:
         raise HTTPException(
