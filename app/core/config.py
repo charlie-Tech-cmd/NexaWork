@@ -1,4 +1,4 @@
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
@@ -9,10 +9,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     redis_url: str = "redis://localhost:6379/0"
 
-    rate_limit_max_attempts: int = 5
-    rate_limit_window_seconds: int = 60
-    rate_limit_ip_max_attempts: int = 30
-    rate_limit_ip_window_seconds: int = 60
+    rate_limit_max_attempts: int = Field(default=5, gt=0)
+    rate_limit_window_seconds: int = Field(default=60, gt=0)
+    rate_limit_ip_max_attempts: int = Field(default=30, gt=0)
+    rate_limit_ip_window_seconds: int = Field(default=60, gt=0)
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -44,6 +44,21 @@ def test_unsafe_production_settings_are_rejected(override, message):
         make_production_settings(**override)
 
 
+@pytest.mark.parametrize(
+    "setting",
+    [
+        "rate_limit_max_attempts",
+        "rate_limit_window_seconds",
+        "rate_limit_ip_max_attempts",
+        "rate_limit_ip_window_seconds",
+    ],
+)
+@pytest.mark.parametrize("value", [0, -1])
+def test_non_positive_rate_limit_settings_are_rejected(setting, value):
+    with pytest.raises(ValidationError):
+        make_production_settings(**{setting: value})
+
+
 def test_development_defaults_remain_available():
     settings = Settings(
         _env_file=None,
