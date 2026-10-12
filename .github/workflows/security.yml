@@ -72,12 +72,17 @@ jobs:
           DB_PASSWORD: ci-postgres-password
           JWT_SECRET_KEY: ci-only-test-secret-not-for-production
         run: |
+          python -m alembic upgrade 3f7330e74933
+          python scripts/verify_team_permission_migration.py seed
+
           python -m alembic upgrade head
+          python scripts/verify_team_permission_migration.py check
           python -m alembic upgrade head
+          python scripts/verify_team_permission_migration.py check
 
           revision="$(python -m alembic current)"
           printf 'Current database revision: %s\n' "$revision"
-          grep -q '3f7330e74933' <<< "$revision"
+          grep -q 'c7e1a2b4d690' <<< "$revision"
 
       - name: Run test suite
         env:
