@@ -17,6 +17,17 @@ jobs:
     name: Dependency Audit and Tests
     runs-on: ubuntu-latest
 
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -40,7 +51,6 @@ jobs:
 
       - name: Run test suite
         env:
-          ENVIRONMENT: test
           JWT_SECRET_KEY: ci-only-test-secret-not-for-production
         run: |
           python -m pytest -q
