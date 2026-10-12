@@ -82,7 +82,15 @@ jobs:
 
           revision="$(python -m alembic current)"
           printf 'Current database revision: %s\n' "$revision"
-          grep -q 'c7e1a2b4d690' <<< "$revision"
+
+          heads="$(python -m alembic heads)"
+          printf 'Configured Alembic heads:\n%s\n' "$heads"
+
+          head_count="$(printf '%s\n' "$heads" | grep -c '(head)')"
+          test "$head_count" -eq 1
+
+          expected_revision="$(printf '%s\n' "$heads" | awk 'NR == 1 {print $1}')"
+          grep -q "$expected_revision" <<< "$revision"
 
       - name: Run test suite
         env:

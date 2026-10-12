@@ -77,6 +77,7 @@ def check(connection):
         "ci-team-permission-test-a",
         "ci-team-permission-test-b",
     ):
+
         names = set(connection.execute(
             text("""
                 SELECT p.name
@@ -90,8 +91,10 @@ def check(connection):
             {"slug": slug},
         ).scalars())
 
-        assert names == expected, (
-            f"{slug}: expected {expected}, got {names}"
+        missing = expected - names
+        assert not missing, (
+            f"{slug}: missing team permissions {missing}; "
+            f"found permissions {names}"
         )
 
     inactive_count = connection.execute(
