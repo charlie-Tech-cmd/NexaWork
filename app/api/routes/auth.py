@@ -10,6 +10,7 @@ from app.core.rate_limit import (
     is_login_allowed,
     is_login_ip_allowed,
     is_password_recovery_allowed,
+    is_password_reset_allowed,
 )
 from app.db.session import get_db
 from app.models.employee import Employee
@@ -153,9 +154,18 @@ async def forgot_password(
 
 @router.post("/auth/reset-password")
 async def reset_password_endpoint(
+    request: Request,
     payload: ResetPasswordRequest,
     db: Session = Depends(get_db),
 ):
+    reset_key = f"password-reset:{request.client.host}"
+
+    if not is_password_reset_allowed(reset_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many password reset attempts. Please try again later.",
+        )
+
     try:
         reset_password(
             db,

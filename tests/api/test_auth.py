@@ -1341,55 +1341,61 @@ def test_forgot_password_email_token_can_reset_password(
     email_service,
     db_session,
 ):
-    user = create_password_reset_test_user(db_session)
-    user.password_hash = hash_password("OldPassword123!")
-    db_session.commit()
+    reset_key = "password-reset:testclient"
+    redis_client.delete(reset_key)
+    try:
 
-    forgot_response = client.post(
-        "/api/v1/auth/forgot-password",
-        json={
-            "email": user.email,
-        },
-    )
+        user = create_password_reset_test_user(db_session)
+        user.password_hash = hash_password("OldPassword123!")
+        db_session.commit()
 
-    assert forgot_response.status_code == 200
-    assert len(email_service.sent_emails) == 1
+        forgot_response = client.post(
+            "/api/v1/auth/forgot-password",
+            json={
+                "email": user.email,
+            },
+        )
 
-    sent_email = email_service.sent_emails[0]
-    body = sent_email["body"]
+        assert forgot_response.status_code == 200
+        assert len(email_service.sent_emails) == 1
 
-    reset_url = next(
-        line
-        for line in body.splitlines()
-        if "reset-password?token=" in line
-    )
+        sent_email = email_service.sent_emails[0]
+        body = sent_email["body"]
 
-    raw_token = reset_url.split("token=", 1)[1]
+        reset_url = next(
+            line
+            for line in body.splitlines()
+            if "reset-password?token=" in line
+        )
 
-    reset_response = client.post(
-        "/api/v1/auth/reset-password",
-        json={
-            "token": raw_token,
-            "new_password": "NewPassword123!",
-        },
-    )
+        raw_token = reset_url.split("token=", 1)[1]
 
-    assert reset_response.status_code == 200
-    assert reset_response.json() == {
-        "message": "Password reset successful",
-    }
+        reset_response = client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "token": raw_token,
+                "new_password": "NewPassword123!",
+            },
+        )
 
-    db_session.refresh(user)
+        assert reset_response.status_code == 200
+        assert reset_response.json() == {
+            "message": "Password reset successful",
+        }
 
-    assert verify_password(
-        "NewPassword123!",
-        user.password_hash,
-    )
-    assert not verify_password(
-        "OldPassword123!",
-        user.password_hash,
-    )
-    assert user.token_version == 1
+        db_session.refresh(user)
+
+        assert verify_password(
+            "NewPassword123!",
+            user.password_hash,
+        )
+        assert not verify_password(
+            "OldPassword123!",
+            user.password_hash,
+        )
+        assert user.token_version == 1
+    finally:
+        redis_client.delete(reset_key)
 
 
 def test_public_registration_endpoint_is_removed(client):
@@ -1404,3 +1410,47 @@ def test_public_registration_endpoint_is_removed(client):
     )
 
     assert response.status_code == 404
+
+
+def test_reset_password_is_rate_limited(client):
+    with patch(
+        "app.api.routes.auth.is_password_reset_allowed",
+        return_value=False,
+    ):
+        response = client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "token": "test-reset-token",
+                "new_password": "NewPassword123!",
+            },
+        )
+
+    assert response.status_code == 429
+    assert response.json() == {
+        "detail": (
+            "Too many password reset attempts. "
+            "Please try again later."
+        ),
+    }
+
+
+def test_reset_password_rate_limit_redis_failure_returns_503(client):
+    with patch(
+        "app.api.routes.auth.is_password_reset_allowed",
+        side_effect=RateLimitUnavailable(),
+    ):
+        response = client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "token": "test-reset-token",
+                "new_password": "NewPassword123!",
+            },
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": (
+            "Authentication is temporarily unavailable. "
+            "Please try again later."
+        ),
+    }
