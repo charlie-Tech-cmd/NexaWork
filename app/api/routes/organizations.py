@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from app.api.dependencies import (
     require_permission,
 )
 
+from app.core.rate_limit import is_organization_onboarding_ip_allowed
 from app.db.session import get_db
 from app.models.organization import Organization
 from app.models.user import User
@@ -43,8 +44,16 @@ router = APIRouter(
 )
 async def onboard_organization(
     onboarding: OrganizationOnboardingCreate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
+    onboarding_ip_key = f"organization-onboard-ip:{request.client.host}"
+    if not is_organization_onboarding_ip_allowed(onboarding_ip_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many organization onboarding attempts. Please try again later.",
+        )
+
     try:
         return onboard_organization_service(
             db=db,

@@ -1016,3 +1016,80 @@ def test_update_organization_status_rejects_missing_organization(
     assert response.json() == {
         "detail": "Organization not found",
     }
+
+
+def test_organization_onboarding_returns_429_when_ip_limit_is_exceeded(
+    client,
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "app.api.routes.organizations.is_organization_onboarding_ip_allowed",
+        lambda key: False,
+    )
+
+    response = client.post(
+        "/api/v1/organizations/onboard",
+        json={
+            "organization_name": "Rate Limited Organization",
+            "organization_slug": "rate-limited-organization",
+            "admin_email": "rate.limited.admin@example.com",
+            "admin_password": "SecurePassword123!",
+            "admin_confirm_password": "SecurePassword123!",
+            "admin_full_name": "Rate Limited Admin",
+        },
+    )
+
+    assert response.status_code == 429
+    assert response.json() == {
+        "detail": (
+            "Too many organization onboarding attempts. "
+            "Please try again later."
+        ),
+    }
+    assert db_session.scalar(
+        select(Organization).where(
+            Organization.slug == "rate-limited-organization"
+        )
+    ) is None
+
+
+def test_organization_onboarding_returns_503_when_rate_limiter_is_unavailable(
+    client,
+    db_session,
+    monkeypatch,
+):
+    from app.core.rate_limit import RateLimitUnavailable
+
+    def rate_limiter_unavailable(key):
+        raise RateLimitUnavailable
+
+    monkeypatch.setattr(
+        "app.api.routes.organizations.is_organization_onboarding_ip_allowed",
+        rate_limiter_unavailable,
+    )
+
+    response = client.post(
+        "/api/v1/organizations/onboard",
+        json={
+            "organization_name": "Unavailable Rate Limiter Organization",
+            "organization_slug": "unavailable-rate-limiter-organization",
+            "admin_email": "unavailable.rate.limiter@example.com",
+            "admin_password": "SecurePassword123!",
+            "admin_confirm_password": "SecurePassword123!",
+            "admin_full_name": "Unavailable Rate Limiter Admin",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": (
+            "Authentication is temporarily unavailable. "
+            "Please try again later."
+        ),
+    }
+    assert db_session.scalar(
+        select(Organization).where(
+            Organization.slug == "unavailable-rate-limiter-organization"
+        )
+    ) is None
