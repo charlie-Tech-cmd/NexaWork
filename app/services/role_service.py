@@ -118,6 +118,9 @@ def assign_permission_to_role(
     if permission is None:
         raise ValueError("Permission not found")
 
+    if not permission.is_active:
+        raise ValueError("Cannot assign an inactive permission")
+
     existing_assignment = db.execute(
         select(role_permissions).where(
             role_permissions.c.role_id == role_id,

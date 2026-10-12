@@ -1196,3 +1196,90 @@ def test_permission_changes_reject_role_from_another_organization(
         assert assignment is None
     else:
         assert assignment is not None
+
+
+def test_assign_inactive_permission_to_role_returns_conflict(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Permission Organization",
+        slug="inactive-permission-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    update_permission = Permission(
+        name="ROLE_UPDATE",
+        description="Update roles",
+        is_active=True,
+    )
+    inactive_permission = Permission(
+        name="INACTIVE_TEST_ACCESS",
+        description="Inactive test permission",
+        is_active=False,
+    )
+    role = Role(
+        organization_id=organization.id,
+        name="Permission Manager",
+        description="Can manage role permissions",
+        is_active=True,
+    )
+    db_session.add_all(
+        [update_permission, inactive_permission, role]
+    )
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.permission.manager@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Permission Manager",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=update_permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive.permission.manager@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    response = client.post(
+        f"/api/v1/roles/{role.id}/permissions/"
+        f"{inactive_permission.id}",
+        headers={
+            "Authorization": (
+                f"Bearer {login_response.json()['access_token']}"
+            ),
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Cannot assign an inactive permission"
+
+    assignment = db_session.execute(
+        role_permissions.select().where(
+            role_permissions.c.role_id == role.id,
+            role_permissions.c.permission_id == inactive_permission.id,
+        )
+    ).first()
+    assert assignment is None
