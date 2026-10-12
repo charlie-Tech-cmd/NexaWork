@@ -32,17 +32,19 @@ def upgrade() -> None:
                 created_at
             )
             SELECT
-                1,
+                o.id,
                 'Organization Admin',
                 'Manage users and organization-level administration',
                 TRUE,
                 NOW()
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM roles
-                WHERE organization_id = 1
-                  AND name = 'Organization Admin'
-            )
+            FROM organizations o
+            WHERE o.id = 1
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM roles
+                  WHERE organization_id = o.id
+                    AND name = 'Organization Admin'
+              )
             """
         )
     )
@@ -84,6 +86,12 @@ def upgrade() -> None:
             FROM roles r
             WHERE r.organization_id = 1
               AND r.name = 'Organization Admin'
+              AND EXISTS (
+                  SELECT 1
+                  FROM users u
+                  WHERE u.id = 1
+                    AND u.organization_id = r.organization_id
+              )
               AND NOT EXISTS (
                   SELECT 1
                   FROM user_roles ur
