@@ -137,33 +137,36 @@ def onboard_organization(
     db.add(admin_role)
     db.flush()
 
+    required_permission_names = [
+        "USER_VIEW",
+        "USER_CREATE",
+        "USER_UPDATE",
+        "USER_DELETE",
+        "ORGANIZATION_UPDATE",
+        "BRANCH_VIEW",
+        "BRANCH_CREATE",
+        "BRANCH_UPDATE",
+        "BRANCH_DELETE",
+        "DEPARTMENT_VIEW",
+        "DEPARTMENT_CREATE",
+        "DEPARTMENT_UPDATE",
+        "DEPARTMENT_DELETE",
+        "TEAM_VIEW",
+        "TEAM_CREATE",
+        "TEAM_UPDATE",
+        "REGION_VIEW",
+        "REGION_CREATE",
+        "REGION_UPDATE",
+    ]
+
     permissions = db.scalars(
         select(Permission).where(
-            Permission.name.in_(
-                [
-                    "USER_VIEW",
-                    "USER_CREATE",
-                    "USER_UPDATE",
-                    "USER_DELETE",
-                    "ORGANIZATION_UPDATE",
-                    "BRANCH_VIEW",
-                    "BRANCH_CREATE",
-                    "BRANCH_UPDATE",
-                    "BRANCH_DELETE",
-                    "DEPARTMENT_VIEW",
-                    "DEPARTMENT_CREATE",
-                    "DEPARTMENT_UPDATE",
-                    "DEPARTMENT_DELETE",
-                    "TEAM_VIEW",
-                    "TEAM_CREATE",
-                    "TEAM_UPDATE",
-                ]
-            ),
+            Permission.name.in_(required_permission_names),
             Permission.is_active.is_(True),
         )
     ).all()
 
-    if len(permissions) != 16:
+    if len(permissions) != len(required_permission_names):
         db.rollback()
         raise RuntimeError("Required permissions are not configured")
 

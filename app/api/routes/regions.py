@@ -2,7 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_organization, get_current_user
+from app.api.dependencies import (
+    get_current_organization,
+    require_permission,
+)
 from app.db.session import get_db
 from app.models.organization import Organization
 from app.models.user import User
@@ -32,7 +35,7 @@ router = APIRouter(
 async def create_region(
     organization_id: int,
     region: RegionCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("REGION_CREATE")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -62,7 +65,7 @@ async def create_region(
 )
 async def get_region(
     region_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("REGION_VIEW")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -85,7 +88,7 @@ async def get_region(
 )
 async def list_regions(
     organization_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("REGION_VIEW")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
@@ -108,7 +111,7 @@ async def list_regions(
 async def update_region(
     region_id: int,
     region_data: RegionUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("REGION_UPDATE")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):

@@ -731,6 +731,9 @@ def test_organization_onboarding_grants_organization_update_permission(
             Permission(name="TEAM_VIEW", description="View teams", is_active=True),
             Permission(name="TEAM_CREATE", description="Create teams", is_active=True),
             Permission(name="TEAM_UPDATE", description="Update teams", is_active=True),
+            Permission(name="REGION_VIEW", description="View regions", is_active=True),
+            Permission(name="REGION_CREATE", description="Create regions", is_active=True),
+            Permission(name="REGION_UPDATE", description="Update regions", is_active=True),
         ]
     )
     db_session.commit()
@@ -793,6 +796,9 @@ def test_organization_onboarding_grants_organization_update_permission(
         "TEAM_VIEW",
         "TEAM_CREATE",
         "TEAM_UPDATE",
+        "REGION_VIEW",
+        "REGION_CREATE",
+        "REGION_UPDATE",
     }
     granted_permissions = set(
         db_session.scalars(
@@ -837,6 +843,9 @@ def test_organization_onboarding_rolls_back_when_required_permission_is_inactive
         "TEAM_VIEW",
         "TEAM_CREATE",
         "TEAM_UPDATE",
+        "REGION_VIEW",
+        "REGION_CREATE",
+        "REGION_UPDATE",
     ]
     db_session.add_all(
         [

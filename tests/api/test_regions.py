@@ -1,8 +1,42 @@
-from app.core.security.password import hash_password
 from sqlalchemy import select
+
+from app.core.security.password import hash_password
 from app.models.organization import Organization
+from app.models.permission import Permission
 from app.models.region import Region
+from app.models.role import Role
+from app.models.role_permission import role_permissions
 from app.models.user import User
+from app.models.user_role import user_roles
+
+
+def _grant_region_permission(db_session, organization, user, permission_name):
+    permission = Permission(
+        name=permission_name,
+        description=f"Test permission: {permission_name}",
+        is_active=True,
+    )
+    role = Role(
+        organization_id=organization.id,
+        name=f"Region Test {permission_name}",
+        description="Region API test role",
+        is_active=True,
+    )
+    db_session.add_all([permission, role])
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
 
 
 def test_get_region_rejects_another_organization(
@@ -35,6 +69,9 @@ def test_get_region_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+    _grant_region_permission(
+        db_session, organization_a, user_a, "REGION_VIEW"
+    )
     db_session.commit()
 
     login_response = client.post(
@@ -84,6 +121,9 @@ def test_get_region_allows_current_organization(
         is_active=True,
     )
     db_session.add(user)
+    _grant_region_permission(
+        db_session, organization, user, "REGION_VIEW"
+    )
     db_session.commit()
 
     login_response = client.post(
@@ -143,6 +183,9 @@ def test_get_region_rejects_inactive_region(
         is_active=True,
     )
     db_session.add(user)
+    _grant_region_permission(
+        db_session, organization, user, "REGION_VIEW"
+    )
     db_session.commit()
 
     login_response = client.post(
@@ -199,6 +242,9 @@ def test_list_regions_excludes_inactive_region(
         is_active=True,
     )
     db_session.add(user)
+    _grant_region_permission(
+        db_session, organization, user, "REGION_VIEW"
+    )
     db_session.commit()
 
     login_response = client.post(
@@ -262,6 +308,9 @@ def test_list_regions_returns_only_current_organization_regions(
         is_active=True,
     )
     db_session.add(user_a)
+    _grant_region_permission(
+        db_session, organization_a, user_a, "REGION_VIEW"
+    )
     db_session.commit()
 
     login_response = client.post(
@@ -289,7 +338,7 @@ def test_list_regions_returns_only_current_organization_regions(
     assert response_data[0]["id"] == region_a.id
     assert response_data[0]["organization_id"] == organization_a.id
     assert response_data[0]["name"] == "Organization A Region"
-    assert response_data[0]["slug"] == "organization-a-region"  
+    assert response_data[0]["slug"] == "organization-a-region"
 
 def test_create_region_rejects_another_organization(
     client,
@@ -314,6 +363,9 @@ def test_create_region_rejects_another_organization(
         is_active=True,
     )
     db_session.add(user_a)
+    _grant_region_permission(
+        db_session, organization_a, user_a, "REGION_CREATE"
+    )
     db_session.commit()
 
     login_response = client.post(
@@ -345,3 +397,213 @@ def test_create_region_rejects_another_organization(
     )
 
     assert created_region is None
+
+def test_get_region_rejects_user_without_region_view_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="No Region View Organization",
+        slug="no-region-view-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Protected Region",
+        slug="protected-region",
+    )
+    user = User(
+        organization_id=organization.id,
+        email="no.region.view@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="No Region View User",
+        is_active=True,
+    )
+    db_session.add_all([region, user])
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "no.region.view@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    response = client.get(
+        f"/api/v1/regions/{region.id}",
+        headers={
+            "Authorization": f"Bearer {login_response.json()['access_token']}"
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Permission denied"}
+
+
+def test_create_region_allows_user_with_region_create_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Region Create Organization",
+        slug="region-create-success-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="region.create.success@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Region Creator",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    _grant_region_permission(
+        db_session, organization, user, "REGION_CREATE"
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "region.create.success@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    response = client.post(
+        f"/api/v1/regions/organizations/{organization.id}",
+        json={
+            "name": "New Test Region",
+            "slug": "new-test-region",
+        },
+        headers={
+            "Authorization": f"Bearer {login_response.json()['access_token']}"
+        },
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "New Test Region"
+    assert data["slug"] == "new-test-region"
+    assert data["organization_id"] == organization.id
+
+
+
+def test_update_region_rejects_user_without_region_update_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="No Region Update Organization",
+        slug="no-region-update-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Protected Region",
+        slug="protected-region",
+    )
+    user = User(
+        organization_id=organization.id,
+        email="no.region.update@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="No Region Update User",
+        is_active=True,
+    )
+    db_session.add_all([region, user])
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "no.region.update@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    response = client.put(
+        f"/api/v1/regions/{region.id}",
+        json={"name": "Unauthorized Update"},
+        headers={
+            "Authorization": (
+                f"Bearer {login_response.json()['access_token']}"
+            )
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Permission denied"}
+
+    db_session.refresh(region)
+    assert region.name == "Protected Region"
+    assert region.slug == "protected-region"
+
+
+def test_update_region_allows_user_with_region_update_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Region Update Organization",
+        slug="region-update-success-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Original Region",
+        slug="original-region",
+    )
+    user = User(
+        organization_id=organization.id,
+        email="region.update.success@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Region Updater",
+        is_active=True,
+    )
+    db_session.add_all([region, user])
+    db_session.flush()
+
+    _grant_region_permission(
+        db_session, organization, user, "REGION_UPDATE"
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "region.update.success@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    response = client.put(
+        f"/api/v1/regions/{region.id}",
+        json={"name": "Updated Region"},
+        headers={
+            "Authorization": (
+                f"Bearer {login_response.json()['access_token']}"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "Updated Region"
+    assert response.json()["slug"] == "original-region"
+
+    db_session.refresh(region)
+    assert region.name == "Updated Region"

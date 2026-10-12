@@ -193,3 +193,25 @@ def test_require_permission_rejects_inactive_role(db_session):
         assert exc.detail == "Permission denied"
     else:
         raise AssertionError("Expected inactive role to be rejected")
+
+
+def test_require_permission_rejects_inactive_permission(db_session):
+    _, permission, _, user = create_rbac_test_data(db_session)
+
+    permission.is_active = False
+    db_session.commit()
+
+    dependency = require_permission("USER_VIEW")
+
+    try:
+        dependency(
+            current_user=user,
+            db=db_session,
+        )
+    except Exception as exc:
+        assert exc.status_code == 403
+        assert exc.detail == "Permission denied"
+    else:
+        raise AssertionError(
+            "Expected inactive permission to be rejected"
+        )
