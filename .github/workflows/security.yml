@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   security:
-    name: Dependency Audit and Tests
+    name: Dependency Audit, Migrations and Tests
     runs-on: ubuntu-latest
 
     services:
@@ -24,6 +24,20 @@ jobs:
           - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: nexawork_migration_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nexawork_migration_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -48,6 +62,22 @@ jobs:
       - name: Audit runtime dependencies
         run: |
           python -m pip_audit --strict -r requirements.txt
+
+      - name: Verify PostgreSQL migrations
+        env:
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          DB_NAME: nexawork_migration_test
+          DB_USER: postgres
+          DB_PASSWORD: ci-postgres-password
+          JWT_SECRET_KEY: ci-only-test-secret-not-for-production
+        run: |
+          python -m alembic upgrade head
+          python -m alembic upgrade head
+
+          revision="$(python -m alembic current)"
+          printf 'Current database revision: %s\n' "$revision"
+          grep -q '3f7330e74933' <<< "$revision"
 
       - name: Run test suite
         env:
