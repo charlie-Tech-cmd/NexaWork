@@ -720,6 +720,17 @@ def test_organization_onboarding_grants_organization_update_permission(
                 description="Update organization settings",
                 is_active=True,
             ),
+            Permission(name="BRANCH_VIEW", description="View branches", is_active=True),
+            Permission(name="BRANCH_CREATE", description="Create branches", is_active=True),
+            Permission(name="BRANCH_UPDATE", description="Update branches", is_active=True),
+            Permission(name="BRANCH_DELETE", description="Delete branches", is_active=True),
+            Permission(name="DEPARTMENT_VIEW", description="View departments", is_active=True),
+            Permission(name="DEPARTMENT_CREATE", description="Create departments", is_active=True),
+            Permission(name="DEPARTMENT_UPDATE", description="Update departments", is_active=True),
+            Permission(name="DEPARTMENT_DELETE", description="Delete departments", is_active=True),
+            Permission(name="TEAM_VIEW", description="View teams", is_active=True),
+            Permission(name="TEAM_CREATE", description="Create teams", is_active=True),
+            Permission(name="TEAM_UPDATE", description="Update teams", is_active=True),
         ]
     )
     db_session.commit()
@@ -765,6 +776,36 @@ def test_organization_onboarding_grants_organization_update_permission(
     )
     assert permission_exists == organization_admin_role.id
 
+    expected_permissions = {
+        "USER_VIEW",
+        "USER_CREATE",
+        "USER_UPDATE",
+        "USER_DELETE",
+        "ORGANIZATION_UPDATE",
+        "BRANCH_VIEW",
+        "BRANCH_CREATE",
+        "BRANCH_UPDATE",
+        "BRANCH_DELETE",
+        "DEPARTMENT_VIEW",
+        "DEPARTMENT_CREATE",
+        "DEPARTMENT_UPDATE",
+        "DEPARTMENT_DELETE",
+        "TEAM_VIEW",
+        "TEAM_CREATE",
+        "TEAM_UPDATE",
+    }
+    granted_permissions = set(
+        db_session.scalars(
+            select(Permission.name)
+            .join(
+                role_permissions,
+                role_permissions.c.permission_id == Permission.id,
+            )
+            .where(role_permissions.c.role_id == organization_admin_role.id)
+        ).all()
+    )
+    assert granted_permissions == expected_permissions
+
     user_role_exists = db_session.scalar(
         select(user_roles.c.user_id).where(
             user_roles.c.user_id == admin_id,
@@ -773,6 +814,73 @@ def test_organization_onboarding_grants_organization_update_permission(
     )
     assert user_role_exists == admin_id
 
+
+
+def test_organization_onboarding_rolls_back_when_required_permission_is_inactive(
+    client,
+    db_session,
+):
+    permission_names = [
+        "USER_VIEW",
+        "USER_CREATE",
+        "USER_UPDATE",
+        "USER_DELETE",
+        "ORGANIZATION_UPDATE",
+        "BRANCH_VIEW",
+        "BRANCH_CREATE",
+        "BRANCH_UPDATE",
+        "BRANCH_DELETE",
+        "DEPARTMENT_VIEW",
+        "DEPARTMENT_CREATE",
+        "DEPARTMENT_UPDATE",
+        "DEPARTMENT_DELETE",
+        "TEAM_VIEW",
+        "TEAM_CREATE",
+        "TEAM_UPDATE",
+    ]
+    db_session.add_all(
+        [
+            Permission(
+                name=name,
+                description=f"Test permission: {name}",
+                is_active=name != "TEAM_UPDATE",
+            )
+            for name in permission_names
+        ]
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/organizations/onboard",
+        json={
+            "organization_name": "Incomplete Setup Organization",
+            "organization_slug": "incomplete-setup-organization",
+            "admin_email": "incomplete.admin@example.com",
+            "admin_password": "SecurePassword123!",
+            "admin_confirm_password": "SecurePassword123!",
+            "admin_full_name": "Incomplete Setup Admin",
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Required permissions are not configured"
+
+    assert db_session.scalar(
+        select(Organization).where(
+            Organization.slug == "incomplete-setup-organization"
+        )
+    ) is None
+    assert db_session.scalar(
+        select(User).where(
+            User.email == "incomplete.admin@example.com"
+        )
+    ) is None
+    assert db_session.scalar(
+        select(Role).where(
+            Role.organization_id.is_not(None),
+            Role.name == "Organization Admin",
+        )
+    ) is None
 
 def test_update_organization_status_requires_super_admin(
     client,

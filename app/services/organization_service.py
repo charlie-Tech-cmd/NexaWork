@@ -146,13 +146,24 @@ def onboard_organization(
                     "USER_UPDATE",
                     "USER_DELETE",
                     "ORGANIZATION_UPDATE",
+                    "BRANCH_VIEW",
+                    "BRANCH_CREATE",
+                    "BRANCH_UPDATE",
+                    "BRANCH_DELETE",
+                    "DEPARTMENT_VIEW",
+                    "DEPARTMENT_CREATE",
+                    "DEPARTMENT_UPDATE",
+                    "DEPARTMENT_DELETE",
+                    "TEAM_VIEW",
+                    "TEAM_CREATE",
+                    "TEAM_UPDATE",
                 ]
             ),
             Permission.is_active.is_(True),
         )
     ).all()
 
-    if len(permissions) != 5:
+    if len(permissions) != 16:
         db.rollback()
         raise RuntimeError("Required permissions are not configured")
 
