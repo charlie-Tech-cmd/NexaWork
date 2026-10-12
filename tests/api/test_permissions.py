@@ -465,3 +465,92 @@ def test_super_admin_can_create_update_and_delete_permissions(
     assert delete_response.status_code == 204
     assert db_session.get(Permission, permission_id) is None
 
+
+def test_super_admin_cannot_delete_permission_assigned_across_organizations(
+    client,
+    db_session,
+):
+    organizations = [
+        Organization(
+            name="Permission Guard Organization A",
+            slug="permission-guard-organization-a",
+        ),
+        Organization(
+            name="Permission Guard Organization B",
+            slug="permission-guard-organization-b",
+        ),
+    ]
+    db_session.add_all(organizations)
+    db_session.flush()
+
+    permission = Permission(
+        name="SHARED_DELETE_GUARD_TEST",
+        description="Must retain all role assignments",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    roles = [
+        Role(
+            organization_id=organization.id,
+            name="Permission Guard Role",
+            is_active=True,
+        )
+        for organization in organizations
+    ]
+    db_session.add_all(roles)
+    db_session.flush()
+
+    for role in roles:
+        db_session.execute(
+            role_permissions.insert().values(
+                role_id=role.id,
+                permission_id=permission.id,
+            )
+        )
+
+    super_admin = User(
+        organization_id=None,
+        email="permission.guard.superadmin@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Permission Guard Super Admin",
+        is_active=True,
+        is_super_admin=True,
+    )
+    db_session.add(super_admin)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/super-admin/login",
+        json={
+            "email": "permission.guard.superadmin@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    response = client.delete(
+        f"/api/v1/permissions/{permission.id}",
+        headers={
+            "Authorization": (
+                f"Bearer {login_response.json()['access_token']}"
+            )
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Cannot delete a permission assigned to one or more roles"
+    )
+
+    db_session.expire_all()
+    assert db_session.get(Permission, permission.id) is not None
+
+    for role in roles:
+        assignment = db_session.execute(
+            role_permissions.select().where(
+                role_permissions.c.role_id == role.id,
+                role_permissions.c.permission_id == permission.id,
+            )
+        ).first()
+        assert assignment is not None

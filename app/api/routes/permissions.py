@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_super_admin, require_permission
 from app.db.session import get_db
 from app.models.permission import Permission
+from app.models.role_permission import role_permissions
 from app.models.user import User
 from app.schemas.permission import (
     PermissionCreate,
@@ -145,6 +146,20 @@ async def delete_permission(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Permission not found",
+        )
+
+    assignment = db.execute(
+        select(role_permissions.c.role_id)
+        .where(role_permissions.c.permission_id == permission_id)
+        .limit(1)
+    ).first()
+
+    if assignment is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Cannot delete a permission assigned to one or more roles"
+            ),
         )
 
     db.delete(permission)
