@@ -734,6 +734,13 @@ def test_organization_onboarding_grants_organization_update_permission(
             Permission(name="REGION_VIEW", description="View regions", is_active=True),
             Permission(name="REGION_CREATE", description="Create regions", is_active=True),
             Permission(name="REGION_UPDATE", description="Update regions", is_active=True),
+            Permission(name="ROLE_VIEW", description="View roles", is_active=True),
+            Permission(name="ROLE_CREATE", description="Create roles", is_active=True),
+            Permission(name="ROLE_UPDATE", description="Update roles", is_active=True),
+            Permission(name="ROLE_DELETE", description="Delete roles", is_active=True),
+            Permission(name="ROLE_ASSIGN_PERMISSION", description="Assign permissions to roles", is_active=True),
+            Permission(name="ROLE_REMOVE_PERMISSION", description="Remove permissions from roles", is_active=True),
+            Permission(name="ADMIN_ACCESS", description="Access administrative functions", is_active=True),
         ]
     )
     db_session.commit()
@@ -799,6 +806,13 @@ def test_organization_onboarding_grants_organization_update_permission(
         "REGION_VIEW",
         "REGION_CREATE",
         "REGION_UPDATE",
+        "ROLE_VIEW",
+        "ROLE_CREATE",
+        "ROLE_UPDATE",
+        "ROLE_DELETE",
+        "ROLE_ASSIGN_PERMISSION",
+        "ROLE_REMOVE_PERMISSION",
+        "ADMIN_ACCESS",
     }
     granted_permissions = set(
         db_session.scalars(
@@ -846,6 +860,13 @@ def test_organization_onboarding_rolls_back_when_required_permission_is_inactive
         "REGION_VIEW",
         "REGION_CREATE",
         "REGION_UPDATE",
+        "ROLE_VIEW",
+        "ROLE_CREATE",
+        "ROLE_UPDATE",
+        "ROLE_DELETE",
+        "ROLE_ASSIGN_PERMISSION",
+        "ROLE_REMOVE_PERMISSION",
+        "ADMIN_ACCESS",
     ]
     db_session.add_all(
         [

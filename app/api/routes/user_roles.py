@@ -5,11 +5,15 @@ from sqlalchemy.orm import Session
 from app.models.organization import Organization
 from app.api.dependencies import (
     get_current_organization,
+    oauth2_scheme,
+    require_admin_access_for_sensitive_change,
     require_permission,
 )
 
 from app.db.session import get_db
+from app.models.permission import Permission
 from app.models.role import Role
+from app.models.role_permission import role_permissions
 from app.models.user import User
 from app.models.user_role import user_roles
 from app.schemas.role import RoleResponse
@@ -31,6 +35,7 @@ async def assign_role_to_user(
     current_user: User = Depends(require_permission("USER_UPDATE")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
 ):
     user = db.scalar(
         select(User).where(
@@ -56,6 +61,32 @@ async def assign_role_to_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Role not found",
+        )
+
+    if not role.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot assign an inactive role",
+        )
+
+    grants_admin_access = db.scalar(
+        select(Permission.id)
+        .join(
+            role_permissions,
+            role_permissions.c.permission_id == Permission.id,
+        )
+        .where(
+            role_permissions.c.role_id == role.id,
+            Permission.name == "ADMIN_ACCESS",
+            Permission.is_active.is_(True),
+        )
+    )
+
+    if grants_admin_access is not None:
+        require_admin_access_for_sensitive_change(
+            current_user=current_user,
+            token=token,
+            db=db,
         )
 
     existing_assignment = db.execute(

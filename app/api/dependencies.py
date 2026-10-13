@@ -284,6 +284,23 @@ def require_any_permission(*permission_names: str):
 
     return permission_dependency
 
+def require_admin_access_for_sensitive_change(
+    current_user: User,
+    token: str,
+    db: Session,
+) -> User:
+    """Require the same caller to hold an admin token and ADMIN_ACCESS."""
+    current_admin = get_current_admin(token=token, db=db)
+
+    if current_admin.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin identity mismatch",
+        )
+
+    return require_admin_access(current_admin=current_admin, db=db)
+
+
 def require_admin_access(
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db),

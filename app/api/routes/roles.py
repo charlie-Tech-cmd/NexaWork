@@ -4,11 +4,14 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import (
     get_current_organization,
+    oauth2_scheme,
+    require_admin_access_for_sensitive_change,
     require_any_permission,
     require_permission,
 )
 from app.db.session import get_db
 from app.models.organization import Organization
+from app.models.permission import Permission
 from app.models.user import User
 from app.schemas.permission import PermissionResponse
 from app.schemas.role import RoleCreate, RoleResponse, RoleUpdate
@@ -139,7 +142,16 @@ async def assign_permission_to_role(
     ),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
 ):
+    permission = db.get(Permission, permission_id)
+    if permission is not None and permission.name == "ADMIN_ACCESS":
+        require_admin_access_for_sensitive_change(
+            current_user=current_user,
+            token=token,
+            db=db,
+        )
+
     try:
         assign_permission_to_role_service(
             db,

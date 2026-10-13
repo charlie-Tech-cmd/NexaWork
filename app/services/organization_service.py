@@ -157,6 +157,13 @@ def onboard_organization(
         "REGION_VIEW",
         "REGION_CREATE",
         "REGION_UPDATE",
+        "ROLE_VIEW",
+        "ROLE_CREATE",
+        "ROLE_UPDATE",
+        "ROLE_DELETE",
+        "ROLE_ASSIGN_PERMISSION",
+        "ROLE_REMOVE_PERMISSION",
+        "ADMIN_ACCESS",
     ]
 
     permissions = db.scalars(
