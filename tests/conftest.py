@@ -51,22 +51,23 @@ def client(db_session: Session, email_service: FakeEmailService):
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_email_service] = lambda: email_service
 
-    with patch(
-        "app.api.routes.auth.is_login_allowed",
-        return_value=True,
-    ):
+    try:
         with patch(
-            "app.api.routes.auth.is_login_ip_allowed",
+            "app.api.routes.auth.is_login_allowed",
             return_value=True,
         ):
             with patch(
-                "app.api.routes.organizations.is_organization_onboarding_ip_allowed",
+                "app.api.routes.auth.is_login_ip_allowed",
                 return_value=True,
             ):
-                with TestClient(app) as test_client:
-                    yield test_client
-
-    app.dependency_overrides.clear()
+                with patch(
+                    "app.api.routes.organizations.is_organization_onboarding_ip_allowed",
+                    return_value=True,
+                ):
+                    with TestClient(app) as test_client:
+                        yield test_client
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture

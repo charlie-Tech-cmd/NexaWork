@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db
+from app.core.logging import request_logger
 
 
 router = APIRouter()
@@ -18,6 +19,7 @@ async def readiness_check(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
     except Exception:
+        request_logger.exception("Database readiness check failed")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="NexaWork API is not ready",

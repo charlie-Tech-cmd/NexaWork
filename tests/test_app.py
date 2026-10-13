@@ -1,5 +1,8 @@
+from fastapi import FastAPI
+
 from app.api.dependencies import get_db
 from app.main import app
+from app.core.middleware import request_logging_middleware
 
 
 def test_health_endpoint(client, caplog):
@@ -17,7 +20,9 @@ def test_readiness_endpoint(client):
     assert response.status_code == 200
     assert response.json() == {"message": "NexaWork API is ready"}
 
-def test_readiness_endpoint_returns_503_when_database_fails(client):
+def test_readiness_endpoint_returns_503_when_database_fails(client, caplog):
+    caplog.set_level("ERROR", logger="nexawork.request")
+
     class FailingSession:
         def execute(self, query):
             raise RuntimeError("database unavailable")
@@ -31,6 +36,9 @@ def test_readiness_endpoint_returns_503_when_database_fails(client):
 
     assert response.status_code == 503
     assert response.json() == {"detail": "NexaWork API is not ready"}
+    assert "Database readiness check failed" in caplog.text
+    assert "database unavailable" in caplog.text
+    assert "database unavailable" not in response.text
 
 
 def test_cors_allows_configured_origin(client):
@@ -68,14 +76,17 @@ def test_rate_limit_settings_defaults():
 def test_unexpected_exception_is_logged(client, caplog):
     caplog.set_level("ERROR", logger="nexawork.request")
 
-    @app.get("/test-monitoring-error")
+    test_app = FastAPI()
+
+    @test_app.get("/test-monitoring-error")
     async def monitoring_error():
         raise RuntimeError("test failure")
 
     from fastapi.testclient import TestClient
 
+    test_app.middleware("http")(request_logging_middleware)
     test_client = TestClient(
-        app,
+        test_app,
         raise_server_exceptions=False,
     )
 
