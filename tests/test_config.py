@@ -7,7 +7,7 @@ from app.core.config import Settings
 def make_production_settings(**overrides):
     values = {
         "environment": "production",
-        "jwt_secret_key": "a-long-production-secret-value",
+        "jwt_secret_key": "test-production-secret-with-enough-length",
         "db_host": "db.example.com",
         "db_password": "a-strong-database-password",
         "password_reset_url": "https://app.example.com/reset-password",
@@ -60,6 +60,29 @@ def test_non_positive_rate_limit_settings_are_rejected(setting, value):
         make_production_settings(**{setting: value})
 
 
+@pytest.mark.parametrize(
+    "setting",
+    [
+        "jwt_access_token_expire_minutes",
+        "password_reset_token_expire_minutes",
+    ],
+)
+@pytest.mark.parametrize("value", [0, -1])
+def test_non_positive_token_lifetimes_are_rejected(setting, value):
+    with pytest.raises(ValidationError):
+        make_production_settings(**{setting: value})
+
+
+def test_short_production_jwt_secret_is_rejected():
+    with pytest.raises(ValidationError, match="32 bytes"):
+        make_production_settings(jwt_secret_key="short-secret")
+
+
+def test_unsupported_jwt_algorithm_is_rejected():
+    with pytest.raises(ValidationError, match="HS256"):
+        make_production_settings(jwt_algorithm="none")
+
+
 def test_development_defaults_remain_available():
     settings = Settings(
         _env_file=None,
@@ -68,3 +91,19 @@ def test_development_defaults_remain_available():
 
     assert settings.environment == "development"
     assert settings.db_host == "localhost"
+
+
+@pytest.mark.parametrize(
+    "password_reset_url",
+    [
+        "https://",
+        "https:///reset-password",
+        "https://user:password@app.example.com/reset-password",
+        "https://app.example.com/reset-password#fragment",
+    ],
+)
+def test_invalid_production_password_reset_urls_are_rejected(
+    password_reset_url,
+):
+    with pytest.raises(ValidationError):
+        make_production_settings(password_reset_url=password_reset_url)

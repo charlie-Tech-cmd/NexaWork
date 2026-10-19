@@ -1,3 +1,6 @@
+from typing import Literal
+from urllib.parse import urlsplit
+
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
@@ -23,10 +26,10 @@ class Settings(BaseSettings):
         ]
 
     jwt_secret_key: str
-    jwt_algorithm: str = "HS256"
-    jwt_access_token_expire_minutes: int = 30
+    jwt_algorithm: Literal["HS256"] = "HS256"
+    jwt_access_token_expire_minutes: int = Field(default=30, gt=0)
 
-    password_reset_token_expire_minutes: int = 30
+    password_reset_token_expire_minutes: int = Field(default=30, gt=0)
     password_reset_url: str = "http://localhost:3000/reset-password"
 
     db_host: str = "localhost"
@@ -82,10 +85,28 @@ class Settings(BaseSettings):
                 "JWT_SECRET_KEY must not use a placeholder in production"
             )
 
-        reset_url = self.password_reset_url.strip().lower()
-        if not reset_url.startswith("https://"):
+        if len(self.jwt_secret_key.encode("utf-8")) < 32:
             errors.append(
-                "PASSWORD_RESET_URL must use HTTPS in production"
+                "JWT_SECRET_KEY must be at least 32 bytes in production"
+            )
+
+        try:
+            parsed_reset_url = urlsplit(self.password_reset_url.strip())
+            reset_url_valid = (
+                parsed_reset_url.scheme.lower() == "https"
+                and bool(parsed_reset_url.hostname)
+                and parsed_reset_url.username is None
+                and parsed_reset_url.password is None
+                and not parsed_reset_url.fragment
+            )
+            parsed_reset_url.port
+        except ValueError:
+            reset_url_valid = False
+
+        if not reset_url_valid:
+            errors.append(
+                "PASSWORD_RESET_URL must be an absolute HTTPS URL "
+                "without credentials or fragments in production"
             )
 
         origins = self.cors_origin_list
