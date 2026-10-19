@@ -1413,3 +1413,158 @@ def test_admin_can_grant_admin_access_with_admin_token(client, db_session):
         role_permissions.c.permission_id == admin_permission.id,
     )).first()
     assert assignment is not None
+
+
+def test_normal_role_manager_cannot_remove_admin_access(client, db_session):
+    organization = Organization(
+        name="Sensitive Removal Organization",
+        slug="sensitive-removal-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    update_permission = Permission(
+        name="ROLE_UPDATE",
+        description="Update roles",
+        is_active=True,
+    )
+    admin_permission = Permission(
+        name="ADMIN_ACCESS",
+        description="Admin access",
+        is_active=True,
+    )
+    manager_role = Role(
+        organization_id=organization.id,
+        name="Sensitive Removal Manager",
+        description="Ordinary role manager",
+        is_active=True,
+    )
+    target_role = Role(
+        organization_id=organization.id,
+        name="Sensitive Removal Target",
+        description="Target administrator role",
+        is_active=True,
+    )
+    user = User(
+        organization_id=organization.id,
+        email="sensitive.removal.manager@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Sensitive Removal Manager",
+        is_active=True,
+    )
+    db_session.add_all([
+        update_permission, admin_permission, manager_role, target_role, user
+    ])
+    db_session.flush()
+
+    db_session.execute(role_permissions.insert().values(
+        role_id=manager_role.id,
+        permission_id=update_permission.id,
+    ))
+    db_session.execute(role_permissions.insert().values(
+        role_id=target_role.id,
+        permission_id=admin_permission.id,
+    ))
+    db_session.execute(user_roles.insert().values(
+        user_id=user.id,
+        role_id=manager_role.id,
+    ))
+    db_session.commit()
+
+    login = client.post("/api/v1/auth/login", json={
+        "email": "sensitive.removal.manager@example.com",
+        "password": "SecurePassword123!",
+    })
+    assert login.status_code == 200
+
+    response = client.delete(
+        f"/api/v1/roles/{target_role.id}/permissions/{admin_permission.id}",
+        headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin authentication required"
+
+    assignment = db_session.execute(role_permissions.select().where(
+        role_permissions.c.role_id == target_role.id,
+        role_permissions.c.permission_id == admin_permission.id,
+    )).first()
+    assert assignment is not None
+
+
+def test_admin_can_remove_admin_access_with_admin_token(client, db_session):
+    organization = Organization(
+        name="Admin Removal Success Organization",
+        slug="admin-removal-success-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    role_permission = Permission(
+        name="ROLE_UPDATE",
+        description="Update roles",
+        is_active=True,
+    )
+    admin_permission = Permission(
+        name="ADMIN_ACCESS",
+        description="Admin access",
+        is_active=True,
+    )
+    admin_role = Role(
+        organization_id=organization.id,
+        name="Admin Removal Success Role",
+        description="Administrator with role management",
+        is_active=True,
+    )
+    target_role = Role(
+        organization_id=organization.id,
+        name="Admin Removal Success Target",
+        description="Target administrator role",
+        is_active=True,
+    )
+    admin_user = User(
+        organization_id=organization.id,
+        email="admin.removal.success@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Admin Removal Success",
+        is_active=True,
+    )
+    db_session.add_all([
+        role_permission, admin_permission, admin_role, target_role, admin_user
+    ])
+    db_session.flush()
+
+    for permission in (role_permission, admin_permission):
+        db_session.execute(role_permissions.insert().values(
+            role_id=admin_role.id,
+            permission_id=permission.id,
+        ))
+
+    db_session.execute(role_permissions.insert().values(
+        role_id=target_role.id,
+        permission_id=admin_permission.id,
+    ))
+    db_session.execute(user_roles.insert().values(
+        user_id=admin_user.id,
+        role_id=admin_role.id,
+    ))
+    db_session.commit()
+
+    login = client.post("/api/v1/auth/admin/login", json={
+        "email": admin_user.email,
+        "password": "SecurePassword123!",
+    })
+    assert login.status_code == 200, login.text
+
+    response = client.delete(
+        f"/api/v1/roles/{target_role.id}/permissions/{admin_permission.id}",
+        headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+    )
+
+    assert response.status_code == 204, response.text
+
+    assignment = db_session.execute(role_permissions.select().where(
+        role_permissions.c.role_id == target_role.id,
+        role_permissions.c.permission_id == admin_permission.id,
+    )).first()
+    assert assignment is None

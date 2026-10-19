@@ -236,7 +236,16 @@ async def remove_permission_from_role(
     ),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
 ):
+    permission = db.get(Permission, permission_id)
+    if permission is not None and permission.name == "ADMIN_ACCESS":
+        require_admin_access_for_sensitive_change(
+            current_user=current_user,
+            token=token,
+            db=db,
+        )
+
     try:
         remove_permission_from_role_service(
             db,
