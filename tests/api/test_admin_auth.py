@@ -188,3 +188,67 @@ def test_admin_login_rejects_inactive_organization(
     assert response.json() == {
         "detail": "Organization is inactive or unavailable",
     }
+
+
+def test_admin_login_rejects_inactive_admin_access_permission(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Inactive Permission Organization",
+        slug="inactive-permission-organization",
+        is_active=True,
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    permission = Permission(
+        name="ADMIN_ACCESS",
+        description="Access administrative portal",
+        is_active=False,
+    )
+
+    admin_role = Role(
+        organization_id=organization.id,
+        name="Organization Admin",
+        description="Administrator role",
+        is_active=True,
+    )
+
+    user = User(
+        organization_id=organization.id,
+        email="inactive.permission.admin@test.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Inactive Permission Admin",
+        is_active=True,
+    )
+
+    db_session.add_all([permission, admin_role, user])
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=admin_role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=admin_role.id,
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/admin/login",
+        json={
+            "email": "inactive.permission.admin@test.com",
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Admin access required",
+    }
