@@ -78,7 +78,6 @@ async def assign_role_to_user(
         .where(
             role_permissions.c.role_id == role.id,
             Permission.name == "ADMIN_ACCESS",
-            Permission.is_active.is_(True),
         )
     )
 
