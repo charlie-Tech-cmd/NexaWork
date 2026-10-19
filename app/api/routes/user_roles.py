@@ -158,6 +158,7 @@ async def remove_role_from_user(
     current_user: User = Depends(require_permission("USER_UPDATE")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
 ):
     user = db.scalar(
         select(User).where(
@@ -183,6 +184,25 @@ async def remove_role_from_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Role not found",
+        )
+
+    grants_admin_access = db.scalar(
+        select(Permission.id)
+        .join(
+            role_permissions,
+            role_permissions.c.permission_id == Permission.id,
+        )
+        .where(
+            role_permissions.c.role_id == role.id,
+            Permission.name == "ADMIN_ACCESS",
+        )
+    )
+
+    if grants_admin_access is not None:
+        require_admin_access_for_sensitive_change(
+            current_user=current_user,
+            token=token,
+            db=db,
         )
 
     existing_assignment = db.execute(
