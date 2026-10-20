@@ -12,6 +12,7 @@ def make_production_settings(**overrides):
         "db_password": "a-strong-database-password",
         "password_reset_url": "https://app.example.com/reset-password",
         "cors_origins": "https://app.example.com",
+        "allowed_hosts": "app.example.com",
     }
     values.update(overrides)
 
@@ -107,3 +108,43 @@ def test_invalid_production_password_reset_urls_are_rejected(
 ):
     with pytest.raises(ValidationError):
         make_production_settings(password_reset_url=password_reset_url)
+
+
+def test_allowed_hosts_are_parsed():
+    settings = Settings(
+        _env_file=None,
+        jwt_secret_key="test-secret-nexawork",
+        allowed_hosts="localhost,app.example.com",
+    )
+
+    assert settings.allowed_host_list == [
+        "localhost",
+        "app.example.com",
+    ]
+
+
+@pytest.mark.parametrize(
+    "allowed_hosts",
+    [
+        "",
+        "*",
+        "app.example.com,*",
+        "localhost",
+        "127.0.0.1",
+        "testserver",
+    ],
+)
+def test_unsafe_production_allowed_hosts_are_rejected(allowed_hosts):
+    with pytest.raises(ValidationError, match="ALLOWED_HOSTS"):
+        make_production_settings(allowed_hosts=allowed_hosts)
+
+
+def test_valid_production_allowed_hosts_are_accepted():
+    settings = make_production_settings(
+        allowed_hosts="app.example.com,api.example.com",
+    )
+
+    assert settings.allowed_host_list == [
+        "app.example.com",
+        "api.example.com",
+    ]

@@ -95,3 +95,34 @@ def test_unexpected_exception_is_logged(client, caplog):
     assert response.status_code == 500
     assert "GET /test-monitoring-error -> 500" in caplog.text
     assert "RuntimeError: test failure" in caplog.text        
+
+
+def test_allowed_host_is_accepted(client):
+    response = client.get(
+        "/health",
+        headers={"Host": "localhost"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_untrusted_host_is_rejected(client):
+    response = client.get(
+        "/health",
+        headers={"Host": "untrusted.example"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_untrusted_host_is_rejected_for_cors_preflight(client):
+    response = client.options(
+        "/health",
+        headers={
+            "Host": "untrusted.example",
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 400

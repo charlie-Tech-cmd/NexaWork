@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.rate_limit import RateLimitUnavailable
 from app.api.routes.auth import router as auth_router
@@ -47,6 +48,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=settings.allowed_host_list,
 )
 
 app.middleware("http")(request_logging_middleware)

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     app_name: str = "NexaWork"
     environment: str = "development"
     cors_origins: str = "http://localhost:3000"
+    allowed_hosts: str = "localhost,127.0.0.1,testserver"
     redis_url: str = "redis://localhost:6379/0"
 
     rate_limit_max_attempts: int = Field(default=5, gt=0)
@@ -23,6 +24,14 @@ class Settings(BaseSettings):
             origin.strip()
             for origin in self.cors_origins.split(",")
             if origin.strip()
+        ]
+
+    @property
+    def allowed_host_list(self) -> list[str]:
+        return [
+            host.strip()
+            for host in self.allowed_hosts.split(",")
+            if host.strip()
         ]
 
     jwt_secret_key: str
@@ -121,6 +130,21 @@ class Settings(BaseSettings):
         ):
             errors.append(
                 "CORS_ORIGINS must contain explicit HTTPS origins in production"
+            )
+
+        hosts = self.allowed_host_list
+        development_hosts = {
+            "localhost", "127.0.0.1", "::1", "testserver"
+        }
+        if not hosts or any(
+            host == "*"
+            or "*" in host
+            or host.strip().lower() in development_hosts
+            for host in hosts
+        ):
+            errors.append(
+                "ALLOWED_HOSTS must contain explicit non-development "
+                "hostnames without wildcards in production"
             )
 
         if errors:
