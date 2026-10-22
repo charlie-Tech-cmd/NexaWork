@@ -64,6 +64,8 @@ def deactivate_user(
 def list_users(
     db: Session,
     organization_id: int,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[User]:
     users = db.scalars(
         select(User)
@@ -72,6 +74,8 @@ def list_users(
             User.is_active.is_(True),
         )
         .order_by(User.id)
+        .offset(offset)
+        .limit(limit)
     ).all()
 
     return users

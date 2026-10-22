@@ -651,3 +651,143 @@ def test_deactivate_user_rejects_user_from_another_organization(
     db_session.refresh(user_b)
 
     assert user_b.is_active is True
+
+
+def test_list_users_pagination_is_bounded_ordered_and_tenant_scoped(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Pagination Test Organization",
+        slug="pagination-test-organization",
+    )
+    other_organization = Organization(
+        name="Other Pagination Organization",
+        slug="other-pagination-organization",
+    )
+    db_session.add_all([organization, other_organization])
+    db_session.flush()
+
+    viewer = User(
+        organization_id=organization.id,
+        email="pagination.viewer@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Pagination Viewer",
+        is_active=True,
+    )
+    db_session.add(viewer)
+    db_session.flush()
+
+    organization_users = [viewer]
+    organization_users.extend(
+        User(
+            organization_id=organization.id,
+            email=f"pagination.user{i}@example.com",
+            password_hash="unused-test-hash",
+            full_name=f"Pagination User {i}",
+            is_active=True,
+        )
+        for i in range(104)
+    )
+    db_session.add_all(organization_users[1:])
+
+    other_organization_users = [
+        User(
+            organization_id=other_organization.id,
+            email=f"other.pagination.user{i}@example.com",
+            password_hash="unused-test-hash",
+            full_name=f"Other Organization User {i}",
+            is_active=True,
+        )
+        for i in range(3)
+    ]
+    db_session.add_all(other_organization_users)
+    db_session.flush()
+
+    permission = Permission(
+        name="USER_VIEW",
+        description="View users",
+        is_active=True,
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Pagination User Viewer",
+        description="Can view users",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=viewer.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": viewer.email,
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    headers = {
+        "Authorization": f"Bearer {login_response.json()['access_token']}"
+    }
+
+    default_response = client.get("/api/v1/users", headers=headers)
+    assert default_response.status_code == 200
+    default_users = default_response.json()
+    assert len(default_users) == 50
+
+    expected_ids = sorted(user.id for user in organization_users)
+
+    assert [user["id"] for user in default_users] == expected_ids[:50]
+
+    maximum_response = client.get(
+        "/api/v1/users",
+        params={"limit": 100},
+        headers=headers,
+    )
+    assert maximum_response.status_code == 200
+    maximum_users = maximum_response.json()
+    assert len(maximum_users) == 100
+    assert [user["id"] for user in maximum_users] == expected_ids[:100]
+
+    next_page_response = client.get(
+        "/api/v1/users",
+        params={"limit": 50, "offset": 50},
+        headers=headers,
+    )
+    assert next_page_response.status_code == 200
+    next_page_users = next_page_response.json()
+    assert [user["id"] for user in next_page_users] == expected_ids[50:100]
+
+    returned_ids = {
+        user["id"]
+        for user in maximum_users + next_page_users
+    }
+    other_organization_ids = {
+        user.id for user in other_organization_users
+    }
+    assert returned_ids.isdisjoint(other_organization_ids)
+
+    invalid_limit_response = client.get(
+        "/api/v1/users",
+        params={"limit": 101},
+        headers=headers,
+    )
+    assert invalid_limit_response.status_code == 422

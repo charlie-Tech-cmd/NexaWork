@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
@@ -116,12 +116,16 @@ async def deactivate_user(
     response_model=list[UserResponse],
 )
 async def list_users(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(require_permission("USER_VIEW")),
     db: Session = Depends(get_db),
 ):
     return list_users_service(
         db=db,
         organization_id=current_user.organization_id,
+        limit=limit,
+        offset=offset,
     )
 
 
