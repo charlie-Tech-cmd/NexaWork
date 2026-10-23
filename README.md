@@ -1,5 +1,9 @@
 # NexaWork
 
+Repository agent guidance is in [AGENTS.md](AGENTS.md). See
+[agent skills setup and validation](docs/AGENT_SKILLS.md) for the pinned engineering
+and interface skill packages, installer, and provenance.
+
 **Connect. Collaborate. Work Smarter.**
 
 NexaWork is a scalable **Workplace Communication & Collaboration Platform** designed to give organizations a centralized digital workplace for communication, collaboration, meetings, file sharing, workplace information, and AI-assisted productivity.
