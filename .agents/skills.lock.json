@@ -1,0 +1,285 @@
+{
+  "version": 1,
+  "skills": {
+    "rpi-production-engineering": {
+      "repository": "https://github.com/maxchichar/rpi-production-engineering.git",
+      "commit": "dc3e9278e974c5507557b31a7868223d1a7dabd2",
+      "files": {
+        "CHANGELOG.md": {
+          "sha256": "3c7b7d1c8bebcd22423741eb522835e01785bef900a56afba914ae48dc86046b",
+          "executable": false
+        },
+        "CONTRIBUTING.md": {
+          "sha256": "6ca84c1d3308dc62956988f760483386d6cdaad75538fe2ed989dd8b0b083dfd",
+          "executable": false
+        },
+        "LICENSE": {
+          "sha256": "ba724c955c218fadd36a9c8fd0f4c533c4eb2f3fb5b5ebb0c71fed6881144eb8",
+          "executable": false
+        },
+        "MANIFEST.sha256": {
+          "sha256": "2f144d162424b60822b38d3b592ee8d5e1744e9c83959d132eaa30043ceebb60",
+          "executable": false
+        },
+        "README.md": {
+          "sha256": "1b2c5ea6ff9305faca2d5005caa3622c52e15697bcc9187523c06c5c44788ec7",
+          "executable": false
+        },
+        "SECURITY.md": {
+          "sha256": "cf3f099302fb546c4eabcb756ed6ece750025c2c9618c2959d4ad68880acb6bb",
+          "executable": false
+        },
+        "SKILL.md": {
+          "sha256": "14f2c2faeff4242e420313252eb2530a1568c32e686c91a8c2b0e508ebb92d65",
+          "executable": false
+        },
+        "VERSION": {
+          "sha256": "59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03",
+          "executable": false
+        },
+        "assets/templates/adr.md": {
+          "sha256": "1ba8d921fa4aa1a08442593795e0578d29b320294a24c62a8458af078e134061",
+          "executable": false
+        },
+        "assets/templates/implementation.md": {
+          "sha256": "db57b8492605f88a9912c62983ab367d61bf4216fd9035788369e1c7d11f9f1a",
+          "executable": false
+        },
+        "assets/templates/plan.md": {
+          "sha256": "8cdce49100f534703f4d5994cbbec05426e209bb308c9aff374a73e0a4975c2c",
+          "executable": false
+        },
+        "assets/templates/release.md": {
+          "sha256": "08d5ff56457a4bcea865b4d490b1aa7c959f1db6e3ca24409c07ea4c38959189",
+          "executable": false
+        },
+        "assets/templates/research.md": {
+          "sha256": "2745ef5cdf18c847c5dced66f00f90e17e9947afced5626bd12767bb1fc8854f",
+          "executable": false
+        },
+        "assets/templates/runbook.md": {
+          "sha256": "b9edefbfa26738d6539db46c7e4d7d68edb3ee3733eaa71f88369af83c5893ec",
+          "executable": false
+        },
+        "assets/templates/threat-model.md": {
+          "sha256": "d4dd8cf2aca866b40a526573156ce7e50c17af693dfd3d431cf63afcdfd9945b",
+          "executable": false
+        },
+        "assets/templates/traceability.csv": {
+          "sha256": "06f9ccb10086ea9875afa2a04442cfa8bb647ccbf9e876349f83ccb8c7c7b494",
+          "executable": false
+        },
+        "examples/ci-gate-example.yml": {
+          "sha256": "56d7f82af3e196710c26bd4cc84b094bcf05070b1715307e6480e7fa63a3929d",
+          "executable": false
+        },
+        "examples/evaluation-scenarios.md": {
+          "sha256": "cf9e3888b7078c5d9136e74975c021f0e9d67fa8d3ee1643e9139ec0d72cdf02",
+          "executable": false
+        },
+        "references/ai-agent-systems.md": {
+          "sha256": "e38dca52a1ed1c1c28e4d10212f25ecacec83b695903d6a44b9b5bfa1727c528",
+          "executable": false
+        },
+        "references/architecture-decisions.md": {
+          "sha256": "a1b441c5bedd91b1f4e34f9fff35d1fc86578a88e8c3288fa3704b90fe52e732",
+          "executable": false
+        },
+        "references/data-api-migrations.md": {
+          "sha256": "d37e664f468957ba0c7f037b9e985f3644bba3c9a537f2dd67c1b392ee85a67c",
+          "executable": false
+        },
+        "references/evidence-and-sources.md": {
+          "sha256": "32511a2e350526be7899546ff1dc0dc6163bf0ec94e1eea3695c0ad253acdbc2",
+          "executable": false
+        },
+        "references/exceptions-and-recovery.md": {
+          "sha256": "2f11bf69d89f6e6e07dc93285c53d713880e9d91c5c35fa57c9a2417d8a0634a",
+          "executable": false
+        },
+        "references/frontend-ux-accessibility.md": {
+          "sha256": "e81a32d50bf2d18d6ce79c67360c6be06d1f282ee1a57736e002a9871dd509c0",
+          "executable": false
+        },
+        "references/gates.json": {
+          "sha256": "8357f4d2eed1991411c571de6f5073bcee49e67f2536d23165f5087b9b7682c9",
+          "executable": false
+        },
+        "references/implementation-playbook.md": {
+          "sha256": "1c932e04203cea0e97a3497c1e38b127b3c8b2ea8406c20b97f6474079b75dc0",
+          "executable": false
+        },
+        "references/operating-contract.md": {
+          "sha256": "a61c38cccd9a1fb10ba4ae368ffda920bdb9676968dbde00c6a16418b07d3004",
+          "executable": false
+        },
+        "references/planning-playbook.md": {
+          "sha256": "ff15a1a58629909816d712d0afcaf871cd6bc6f14b6d3847845c7e4e431fb883",
+          "executable": false
+        },
+        "references/reliability-operations.md": {
+          "sha256": "c8edcf4b6fa6bd26ea6c537c11cbf45f18602b740d07484c92d75f416df6eac9",
+          "executable": false
+        },
+        "references/research-playbook.md": {
+          "sha256": "f1c7f391ec35bf82499a7422d91311376d015e4f10284ba6604d8361ee71ff2b",
+          "executable": false
+        },
+        "references/review-scorecard.md": {
+          "sha256": "f456eba1c53b14671436d9231599527f4890c9a3ff50e56b25d52e1c4630e20d",
+          "executable": false
+        },
+        "references/security-privacy.md": {
+          "sha256": "9f8a82c2f88d26f502adb617d4dee3581502180d6514e7dd9623578a04f40309",
+          "executable": false
+        },
+        "references/stack-profiles.md": {
+          "sha256": "d57af1774c8a903cf88923cf5d8aa41f8124facdb631a31e3ca72d257ed1c4e8",
+          "executable": false
+        },
+        "references/testing-verification.md": {
+          "sha256": "9d3dd555be2f4f97dd22fb4bbe417d4466eb53885aa9fb410cf02d3f35af8319",
+          "executable": false
+        },
+        "scripts/rpi.py": {
+          "sha256": "3b402466c2ff5d57826b615d53490e38d08e037583fe5f55c64cbe47d17a2634",
+          "executable": true
+        },
+        "scripts/test_rpi.py": {
+          "sha256": "058377bc98efacfb23a02ef97828f218b792928abe3071dc61feade14ba88ef0",
+          "executable": false
+        },
+        "scripts/validate_skill.py": {
+          "sha256": "c7ae5bb78167748eb6e2456188d5cb4cec165e2befb7c93a927329bec52bef77",
+          "executable": true
+        }
+      }
+    },
+    "interface-forge": {
+      "repository": "https://github.com/maxchichar/interface-forge.git",
+      "commit": "da70c1ca8869c10f0cf3e64ad90abf324a37da6a",
+      "files": {
+        "LICENSE": {
+          "sha256": "c76639b7d795ddfc49ac7e9b4620e192b531f5e0cf6e3c18321595cbaec676ca",
+          "executable": false
+        },
+        "README.md": {
+          "sha256": "cea13446ff95c9b4d589addbde1920c90271e71aa8cedd182c6154ceaa2d6c6f",
+          "executable": false
+        },
+        "SKILL.md": {
+          "sha256": "5561daf1053c4adb1550502e09ec13177489c694cfcc8259e444939e02da7153",
+          "executable": false
+        },
+        "assets/templates/DESIGN-DECISIONS.md": {
+          "sha256": "6482962f1a614b236bbd22d326eea04c91e31ccfb5855e3bae3026a00337057d",
+          "executable": false
+        },
+        "assets/templates/DESIGN-SYSTEM.md": {
+          "sha256": "afc36512c717a443c7be8dbcfd0483e7331b9a4db5366e2a2b846d129cb5a71c",
+          "executable": false
+        },
+        "assets/templates/PRODUCT-UX.md": {
+          "sha256": "4559b4e9cfc8f0dde2d7a77901a85f09eb02d3242a7a5edd4b04ff8ad11df546",
+          "executable": false
+        },
+        "assets/templates/QA-REPORT.md": {
+          "sha256": "21b3c109a134c64cdf7cfe245af253b58fe2b0e604271fe19d14a07183455a47",
+          "executable": false
+        },
+        "docs/ROADMAP.md": {
+          "sha256": "f2167abad5d8a80b2eaced5d7e27e171cd7cdf38c3ef044e4cfa766129c8f25d",
+          "executable": false
+        },
+        "docs/USAGE.md": {
+          "sha256": "d646be4c95e2e7a0c0fd87e6b265a2525df6615f23fe1e1403766a01116cc043",
+          "executable": false
+        },
+        "evals/cases.jsonl": {
+          "sha256": "0a8a325c638650de700caa14ccec36520d8c8abde2e775e42058e503bc85ba85",
+          "executable": false
+        },
+        "evals/rubric.md": {
+          "sha256": "60cee026f6aeac86fdd675a9162725586cd05c5db751e0c2f86adc8b3cb40b35",
+          "executable": false
+        },
+        "references/accessibility.md": {
+          "sha256": "fa64afc18b9e56fe5ab5bdae7c66808ff444c9410b3cc3b1f4587b4fdbd738ad",
+          "executable": false
+        },
+        "references/agent-integration.md": {
+          "sha256": "bfe9a35b0441c97f92fee19036a9235d1940d58de114683eca4246afa2731806",
+          "executable": false
+        },
+        "references/art-direction.md": {
+          "sha256": "28d56c6fa547da4d8be8ff816dd117d5cc7f1ea9cd3dd7c4f290cac677b57c7b",
+          "executable": false
+        },
+        "references/design-review.md": {
+          "sha256": "1a00d13467c287bc90a62b89cfa7bf309ce0009bdca2b4ea1708f24d625cf4c8",
+          "executable": false
+        },
+        "references/design-system.md": {
+          "sha256": "c03c52a8e6f69692e3e99a7d60267182dae07c216fa4a5bae0cb12a243e79d18",
+          "executable": false
+        },
+        "references/frontend-engineering.md": {
+          "sha256": "dadf779f226ec6ce9456da75e52c06832819469d9df6888733540c1e21f1b803",
+          "executable": false
+        },
+        "references/library-decision-matrix.md": {
+          "sha256": "2f8f8712f5777747003d906a7f1d0e8eb872e67ac92ede33cf1f132ab409cc0e",
+          "executable": false
+        },
+        "references/motion-effects.md": {
+          "sha256": "50a3b9e1e815591c5c3c4cf3c6533a4475d0d0fb788e1d35f48fc48fe8a8e97a",
+          "executable": false
+        },
+        "references/performance.md": {
+          "sha256": "f8fa788188e9c8a5364ea45cbbab34cf21b080ceab584d0e5d85824bfdc1f603",
+          "executable": false
+        },
+        "references/product-playbooks.md": {
+          "sha256": "55802deeffb8d8e8010771df6865275a91e97ea1d5d64b582d2cdc471d7be915",
+          "executable": false
+        },
+        "references/qa-verification.md": {
+          "sha256": "e8c1baf0905c11d34a5a4256c9ab74f6182b4d969d2afa2a3e1fbe8187e8f3d4",
+          "executable": false
+        },
+        "references/research-protocol.md": {
+          "sha256": "608e0cb6299aae28b9ce266074eaf8faf2ef34c097371f383011b1858c574e34",
+          "executable": false
+        },
+        "references/security-privacy.md": {
+          "sha256": "0e9897f6f487d2e5dbda126f3470d8d74f7a7a673b439188384ae92e8ab18447",
+          "executable": false
+        },
+        "references/source-notes.md": {
+          "sha256": "a810866f54e07caf672d37612215a8c8673dd2a27fb51217e49a1bf500198223",
+          "executable": false
+        },
+        "references/ux-architecture.md": {
+          "sha256": "c21754f97328d8ec75c939b8956d8dfde1ec3e2ab6aa9c576709acfb98322a90",
+          "executable": false
+        },
+        "scripts/inspect_project.py": {
+          "sha256": "76da982f4e4946f4aac2dabbf435fd6790fd67c8ac1883bebb91875129cb26e0",
+          "executable": true
+        },
+        "scripts/install.sh": {
+          "sha256": "934ebb9b4c96b2ebb4fa6470f83a8ab69f265f4ba0da9466631d082bb052e150",
+          "executable": true
+        },
+        "scripts/validate_skill.py": {
+          "sha256": "d18401a460d4e9274d2380a358056f2b1b09f6d6301f0da3e632a8138bd7c514",
+          "executable": true
+        },
+        "tests/test_skill.py": {
+          "sha256": "aea6a9296330ecc915997c492ffb6e8ada93ad02c93f31b4fd0439ab10cb430e",
+          "executable": false
+        }
+      }
+    }
+  }
+}
