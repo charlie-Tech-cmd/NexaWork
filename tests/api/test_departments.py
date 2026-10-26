@@ -541,3 +541,184 @@ def test_create_department_rejects_inactive_branch(
     )
 
     assert created_department is None
+
+
+def test_get_department_rejects_branch_owned_by_another_organization(
+    client,
+    db_session,
+):
+    organization_a = Organization(
+        name="Branch Owner Organization",
+        slug="branch-owner-org",
+    )
+    organization_b = Organization(
+        name="Region Owner Organization",
+        slug="region-owner-org",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    region_b = Region(
+        organization_id=organization_b.id,
+        name="Organization B Region",
+        slug="mismatched-region",
+    )
+    db_session.add(region_b)
+    db_session.flush()
+
+    # Deliberately inconsistent ownership for regression testing.
+    branch_a = Branch(
+        organization_id=organization_a.id,
+        region_id=region_b.id,
+        name="Organization A Branch",
+        slug="mismatched-branch",
+    )
+    db_session.add(branch_a)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch_a.id,
+        name="Protected Department",
+        slug="protected-department",
+    )
+    db_session.add(department)
+
+    user_b = User(
+        organization_id=organization_b.id,
+        email="region.owner@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization B User",
+        is_active=True,
+    )
+    db_session.add(user_b)
+    db_session.flush()
+    grant_permission(db_session, user_b, "DEPARTMENT_VIEW")
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "region.owner@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    response = client.get(
+        f"/api/v1/departments/{department.id}",
+        headers={
+            "Authorization": (
+                f"Bearer {login_response.json()['access_token']}"
+            )
+        },
+    )
+
+    assert response.status_code == 404
+
+
+def test_list_departments_pagination_is_bounded_ordered_and_validated(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Department Pagination Organization",
+        slug="department-pagination-org",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Department Pagination Region",
+        slug="department-pagination-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Department Pagination Branch",
+        slug="department-pagination-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    departments = [
+        Department(
+            branch_id=branch.id,
+            name=f"Pagination Department {index:03}",
+            slug=f"pagination-department-{index:03}",
+        )
+        for index in range(104)
+    ]
+    db_session.add_all(departments)
+
+    user = User(
+        organization_id=organization.id,
+        email="department.pagination@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Department Pagination User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+    grant_permission(db_session, user, "DEPARTMENT_VIEW")
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "department.pagination@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    headers = {
+        "Authorization": f"Bearer {login_response.json()['access_token']}"
+    }
+    endpoint = f"/api/v1/departments/branches/{branch.id}"
+
+    default_response = client.get(endpoint, headers=headers)
+    assert default_response.status_code == 200
+    default_page = default_response.json()
+    assert len(default_page) == 50
+    assert [item["id"] for item in default_page] == sorted(
+        item["id"] for item in default_page
+    )
+
+    maximum_response = client.get(
+        endpoint,
+        params={"limit": 100},
+        headers=headers,
+    )
+    assert maximum_response.status_code == 200
+    assert len(maximum_response.json()) == 100
+
+    offset_response = client.get(
+        endpoint,
+        params={"limit": 20, "offset": 50},
+        headers=headers,
+    )
+    assert offset_response.status_code == 200
+    assert len(offset_response.json()) == 20
+    assert offset_response.json()[0]["id"] == default_page[0]["id"] + 50
+
+    assert client.get(
+        endpoint,
+        params={"limit": 101},
+        headers=headers,
+    ).status_code == 422
+
+    assert client.get(
+        endpoint,
+        params={"limit": 0},
+        headers=headers,
+    ).status_code == 422
+
+    assert client.get(
+        endpoint,
+        params={"offset": -1},
+        headers=headers,
+    ).status_code == 422

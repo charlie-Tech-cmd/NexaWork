@@ -35,6 +35,7 @@ def create_employee(
         .join(Region, Region.id == Branch.region_id)
         .where(
             Branch.id == branch_id,
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
             Region.is_active.is_(True),
             Branch.is_active.is_(True),
@@ -91,6 +92,7 @@ def get_employee(
             Employee.id == employee_id,
             Employee.organization_id == organization_id,
             Employee.is_active.is_(True),
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
             Region.is_active.is_(True),
             Branch.is_active.is_(True),
@@ -119,6 +121,7 @@ def update_employee(
         .join(Region, Region.id == Branch.region_id)
         .where(
             Employee.id == employee_id,
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
             Employee.organization_id == organization_id,
             Region.is_active.is_(True),
@@ -146,6 +149,7 @@ def update_employee(
             .join(Region, Region.id == Branch.region_id)
             .where(
                 Branch.id == branch_id,
+                Branch.organization_id == organization_id,
                 Region.organization_id == organization_id,
                 Region.is_active.is_(True),
                 Branch.is_active.is_(True),
@@ -209,6 +213,8 @@ def list_department_employees(
     db: Session,
     organization_id: int,
     department_id: int,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[Employee]:
     department = db.scalar(
         select(Department)
@@ -219,6 +225,7 @@ def list_department_employees(
             Department.is_active.is_(True),
             Branch.is_active.is_(True),
             Region.is_active.is_(True),
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
         )
     )
@@ -234,6 +241,8 @@ def list_department_employees(
             Employee.is_active.is_(True),
         )
         .order_by(Employee.id)
+        .offset(offset)
+        .limit(limit)
     ).all()
 
     return employees

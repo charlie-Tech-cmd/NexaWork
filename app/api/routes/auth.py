@@ -10,6 +10,7 @@ from app.core.rate_limit import (
     is_login_allowed,
     is_login_ip_allowed,
     is_password_recovery_allowed,
+    is_password_recovery_ip_allowed,
     is_password_reset_allowed,
 )
 from app.db.session import get_db
@@ -120,6 +121,15 @@ async def forgot_password(
     db: Session = Depends(get_db),
     email_service: EmailService = Depends(get_email_service),
 ):
+    recovery_ip_key = (
+        f"password-recovery-ip:{request.client.host}"
+    )
+    if not is_password_recovery_ip_allowed(recovery_ip_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many password recovery attempts. Please try again later.",
+        )
+
     recovery_key = (
         f"password-recovery:{request.client.host}:"
         f"{payload.email.lower()}"

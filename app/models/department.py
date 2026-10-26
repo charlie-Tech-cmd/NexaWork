@@ -15,6 +15,11 @@ class Department(Base):
             "slug",
             name="uq_departments_branch_slug",
         ),
+        UniqueConstraint(
+            "id",
+            "branch_id",
+            name="uq_departments_id_branch",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

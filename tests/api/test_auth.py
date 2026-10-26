@@ -206,6 +206,7 @@ def test_auth_me_rejects_token_for_nonexistent_user(client):
         {
             "sub": "999999",
             "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
+            "token_version": 0,
         },
         settings.jwt_secret_key,
         algorithm=settings.jwt_algorithm,
@@ -1301,6 +1302,80 @@ def test_forgot_password_is_rate_limited(client, monkeypatch):
     }
 
     redis_client.delete(recovery_key)
+
+
+def test_forgot_password_ip_limit_blocks_different_emails(
+    client,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "rate_limit_ip_max_attempts", 1)
+
+    ip_key = "password-recovery-ip:testclient"
+    email_keys = [
+        "password-recovery:testclient:ip-limit-first@example.com",
+        "password-recovery:testclient:ip-limit-second@example.com",
+    ]
+    keys = [ip_key, *email_keys]
+
+    redis_client.delete(*keys)
+    try:
+        first_response = client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "ip-limit-first@example.com"},
+        )
+        second_response = client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "ip-limit-second@example.com"},
+        )
+
+        assert first_response.status_code == 200
+        assert second_response.status_code == 429
+        assert second_response.json() == {
+            "detail": (
+                "Too many password recovery attempts. "
+                "Please try again later."
+            ),
+        }
+    finally:
+        redis_client.delete(*keys)
+
+
+def test_forgot_password_is_rate_limited_by_ip(client):
+    with patch(
+        "app.api.routes.auth.is_password_recovery_ip_allowed",
+        return_value=False,
+    ):
+        response = client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "another-recovery-address@example.com"},
+        )
+
+    assert response.status_code == 429
+    assert response.json() == {
+        "detail": (
+            "Too many password recovery attempts. "
+            "Please try again later."
+        ),
+    }
+
+
+def test_forgot_password_ip_rate_limit_redis_failure_returns_503(client):
+    with patch(
+        "app.api.routes.auth.is_password_recovery_ip_allowed",
+        side_effect=RateLimitUnavailable(),
+    ):
+        response = client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "recovery-ip-outage@example.com"},
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": (
+            "Authentication is temporarily unavailable. "
+            "Please try again later."
+        ),
+    }
 
 
 def test_forgot_password_sends_reset_email(

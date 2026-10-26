@@ -607,3 +607,96 @@ def test_update_region_allows_user_with_region_update_permission(
 
     db_session.refresh(region)
     assert region.name == "Updated Region"
+
+def test_list_regions_pagination_is_bounded_ordered_and_validated(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Region Pagination Organization",
+        slug="region-pagination-org",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    regions = [
+        Region(
+            organization_id=organization.id,
+            name=f"Pagination Region {index:03d}",
+            slug=f"pagination-region-{index:03d}",
+            is_active=True,
+        )
+        for index in range(104)
+    ]
+    db_session.add_all(regions)
+
+    user = User(
+        organization_id=organization.id,
+        email="region.pagination@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Region Pagination User",
+        is_active=True,
+    )
+    db_session.add(user)
+    _grant_region_permission(
+        db_session, organization, user, "REGION_VIEW"
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "region.pagination@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    headers = {
+        "Authorization": f"Bearer {login_response.json()['access_token']}"
+    }
+    url = f"/api/v1/regions/organizations/{organization.id}"
+
+    default_response = client.get(url, headers=headers)
+    assert default_response.status_code == 200
+    assert len(default_response.json()) == 50
+    assert [region["id"] for region in default_response.json()] == sorted(
+        region["id"] for region in default_response.json()
+    )
+
+    maximum_response = client.get(
+        url,
+        params={"limit": 100},
+        headers=headers,
+    )
+    assert maximum_response.status_code == 200
+    assert len(maximum_response.json()) == 100
+
+    offset_response = client.get(
+        url,
+        params={"limit": 20, "offset": 50},
+        headers=headers,
+    )
+    assert offset_response.status_code == 200
+    assert len(offset_response.json()) == 20
+    assert [region["id"] for region in offset_response.json()] == [
+        region["id"] for region in maximum_response.json()
+    ][50:70]
+
+    assert client.get(
+        url,
+        params={"limit": 101},
+        headers=headers,
+    ).status_code == 422
+
+    assert client.get(
+        url,
+        params={"limit": 0},
+        headers=headers,
+    ).status_code == 422
+
+    assert client.get(
+        url,
+        params={"offset": -1},
+        headers=headers,
+    ).status_code == 422

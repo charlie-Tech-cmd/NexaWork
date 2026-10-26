@@ -66,6 +66,8 @@ def list_region_branches(
     db: Session,
     organization_id: int,
     region_id: int,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[Branch]:
     region = db.scalar(
         select(Region).where(
@@ -85,6 +87,8 @@ def list_region_branches(
             Branch.organization_id == organization_id,
         )
         .order_by(Branch.id)
+        .offset(offset)
+        .limit(limit)
     ).all()
 
     return branches

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -82,8 +83,23 @@ def reset_password(
     if user is None:
         raise ValueError("Invalid or expired password reset token")
 
+    # Atomically claim the token. Concurrent requests may both read the
+    # unused token above, but only one can update this row successfully.
+    claim = db.execute(
+        update(PasswordResetToken)
+        .where(
+            PasswordResetToken.id == reset_token.id,
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.expires_at > now,
+        )
+        .values(used_at=now)
+        .execution_options(synchronize_session="fetch")
+    )
+
+    if claim.rowcount != 1:
+        raise ValueError("Invalid or expired password reset token")
+
     user.password_hash = hash_password(new_password)
     user.token_version += 1
-    reset_token.used_at = now
 
     db.flush()

@@ -1,6 +1,13 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -15,15 +22,25 @@ class Branch(Base):
             "slug",
             name="uq_branches_region_slug",
         ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            name="uq_branches_id_organization",
+        ),
+        ForeignKeyConstraint(
+            ["region_id", "organization_id"],
+            ["regions.id", "regions.organization_id"],
+            name="fk_branches_region_organization",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
     organization_id: Mapped[int] = mapped_column(
-    ForeignKey("organizations.id"),
-    nullable=False,
-    index=True,
-)
+        ForeignKey("organizations.id"),
+        nullable=False,
+        index=True,
+    )
     region_id: Mapped[int] = mapped_column(
         ForeignKey("regions.id"),
         nullable=False,

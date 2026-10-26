@@ -399,3 +399,103 @@ def test_list_branches_rejects_inactive_region(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Region not found"}
+
+
+def test_list_branches_pagination_is_bounded_ordered_and_validated(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Branch Pagination Organization",
+        slug="branch-pagination-org",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Branch Pagination Region",
+        slug="branch-pagination-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branches = [
+        Branch(
+            organization_id=organization.id,
+            region_id=region.id,
+            name=f"Pagination Branch {index:03d}",
+            slug=f"pagination-branch-{index:03d}",
+        )
+        for index in range(104)
+    ]
+    db_session.add_all(branches)
+
+    user = User(
+        organization_id=organization.id,
+        email="branch.pagination@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Branch Pagination User",
+        is_active=True,
+    )
+    db_session.add(user)
+    grant_permission(db_session, user, "BRANCH_VIEW")
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "branch.pagination@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    headers = {
+        "Authorization": f"Bearer {login_response.json()['access_token']}"
+    }
+    url = f"/api/v1/branches/regions/{region.id}"
+
+    default_response = client.get(url, headers=headers)
+    assert default_response.status_code == 200
+    assert len(default_response.json()) == 50
+    assert [branch["id"] for branch in default_response.json()] == sorted(
+        branch["id"] for branch in default_response.json()
+    )
+
+    maximum_response = client.get(
+        url,
+        params={"limit": 100},
+        headers=headers,
+    )
+    assert maximum_response.status_code == 200
+    assert len(maximum_response.json()) == 100
+
+    offset_response = client.get(
+        url,
+        params={"limit": 20, "offset": 50},
+        headers=headers,
+    )
+    assert offset_response.status_code == 200
+    assert len(offset_response.json()) == 20
+    assert [branch["id"] for branch in offset_response.json()] == [
+        branch["id"] for branch in maximum_response.json()
+    ][50:70]
+
+    assert client.get(
+        url,
+        params={"limit": 101},
+        headers=headers,
+    ).status_code == 422
+
+    assert client.get(
+        url,
+        params={"limit": 0},
+        headers=headers,
+    ).status_code == 422
+
+    assert client.get(
+        url,
+        params={"offset": -1},
+        headers=headers,
+    ).status_code == 422

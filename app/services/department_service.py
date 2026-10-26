@@ -20,6 +20,7 @@ def create_department(
         .where(
             Branch.id == branch_id,
             Branch.is_active.is_(True),
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
             Region.is_active.is_(True),
         )
@@ -57,6 +58,7 @@ def get_department(
         .join(Region, Branch.region_id == Region.id)
         .where(
             Department.id == department_id,
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
             Region.is_active.is_(True),
             Branch.is_active.is_(True),
@@ -73,6 +75,8 @@ def list_branch_departments(
     db: Session,
     organization_id: int,
     branch_id: int,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[Department]:
     branch = db.scalar(
         select(Branch)
@@ -80,6 +84,7 @@ def list_branch_departments(
         .where(
             Branch.id == branch_id,
             Branch.is_active.is_(True),
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
             Region.is_active.is_(True),
         )
@@ -92,6 +97,8 @@ def list_branch_departments(
         select(Department)
         .where(Department.branch_id == branch_id)
         .order_by(Department.id)
+        .offset(offset)
+        .limit(limit)
     ).all()
 
 
@@ -109,6 +116,7 @@ def update_department(
         .join(Region, Branch.region_id == Region.id)
         .where(
             Department.id == department_id,
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
             Region.is_active.is_(True),
             Branch.is_active.is_(True),

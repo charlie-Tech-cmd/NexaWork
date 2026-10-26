@@ -628,6 +628,76 @@ def test_assign_role_to_user_rejects_inactive_role(client, db_session):
     assert assignment is None
 
 
+def test_normal_user_manager_cannot_assign_role_with_inactive_admin_access(
+    client, db_session
+):
+    organization = Organization(
+        name="Sensitive Assignment Organization",
+        slug="sensitive-assignment-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    update_permission = Permission(
+        name="USER_UPDATE", description="Update users", is_active=True
+    )
+    admin_permission = Permission(
+        name="ADMIN_ACCESS", description="Admin access", is_active=False
+    )
+    manager_role = Role(
+        organization_id=organization.id,
+        name="Sensitive Assignment Manager",
+        description="Ordinary user manager",
+        is_active=True,
+    )
+    target_role = Role(
+        organization_id=organization.id,
+        name="Sensitive Assignment Target",
+        description="Admin-enabled role",
+        is_active=True,
+    )
+    user = User(
+        organization_id=organization.id,
+        email="sensitive.assignment.manager@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Sensitive Assignment Manager",
+        is_active=True,
+    )
+    db_session.add_all([
+        update_permission, admin_permission, manager_role, target_role, user
+    ])
+    db_session.flush()
+    db_session.execute(role_permissions.insert().values(
+        role_id=manager_role.id, permission_id=update_permission.id
+    ))
+    db_session.execute(role_permissions.insert().values(
+        role_id=target_role.id, permission_id=admin_permission.id
+    ))
+    db_session.execute(user_roles.insert().values(
+        user_id=user.id, role_id=manager_role.id
+    ))
+    db_session.commit()
+
+    login = client.post("/api/v1/auth/login", json={
+        "email": "sensitive.assignment.manager@example.com",
+        "password": "SecurePassword123!",
+    })
+    assert login.status_code == 200
+
+    response = client.post(
+        f"/api/v1/users/{user.id}/roles/{target_role.id}",
+        headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin authentication required"
+    assignment = db_session.execute(user_roles.select().where(
+        user_roles.c.user_id == user.id,
+        user_roles.c.role_id == target_role.id,
+    )).first()
+    assert assignment is None
+
+
 def test_admin_can_assign_admin_enabled_role_with_admin_token(
     client, db_session
 ):

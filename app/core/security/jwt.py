@@ -36,6 +36,7 @@ def decode_access_token(token: str) -> dict:
             token,
             settings.jwt_secret_key,
             algorithms=[settings.jwt_algorithm],
+            options={"require": ["sub", "exp", "token_version"]},
         )
     except InvalidTokenError as exc:
         raise ValueError("Invalid or expired token") from exc
