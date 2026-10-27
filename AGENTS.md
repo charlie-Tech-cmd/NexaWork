@@ -12,7 +12,8 @@ Report checks as PASS, FAIL, NOT RUN, or NOT APPLICABLE; never claim unrun check
   organization, authentication, RBAC, and audit boundaries.
 - `README.md` and `docs/NEXAWORK_PRODUCT_SPEC.md` include future capabilities.
   Verify what exists before planning; the specification is context, not a task
-  to build the full platform. No frontend package is currently present.
+  to build the full platform. The React/TypeScript client is in `frontend/`; see
+  its README for supported workflows and API integration.
 - Keep secrets out of source and logs. Use `.env.example` for configuration names.
 
 ## Skills
@@ -36,8 +37,9 @@ instructions, explicit user scope, or access controls. Preserve unrelated work.
   `JWT_SECRET_KEY`; Redis integration tests require a local Redis instance.
 - Follow `.github/workflows/security.yml` for dependency audit and PostgreSQL
   migration checks against a disposable database. Never target production tests.
-- No formatter, linter, type checker, or frontend build is configured. Report this
-  accurately rather than inventing successful commands.
+- Frontend checks, from `frontend/`: `npm ci`, `npm run format:check`,
+  `npm test`, `npm run build`, and `npm audit`. Backend formatter/linter remain
+  unconfigured. Report unrun checks accurately.
 - For guidance/skill-only changes, run the installer integrity check, both package
   validators and unit suites, and `git diff --check`.
 - Changes to app behavior require relevant application tests too. Report missing

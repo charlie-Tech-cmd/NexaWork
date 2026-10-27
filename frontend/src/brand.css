@@ -1,0 +1,55 @@
+:root {
+  --font-sans:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --ink: #14243d;
+  --muted: #5e697b;
+  --subtle: #627087;
+  --action: #275ee8;
+  --action-hover: #174ac9;
+  --action-pressed: #123ca5;
+  --selected: #eaf0ff;
+  --selected-border: #b7c9fa;
+  --navy: #12243e;
+  --navy-raised: #1c3353;
+  --inverse: #ffffff;
+  --inverse-muted: #bfcee3;
+  --inverse-border: #3b506e;
+  --surface: #ffffff;
+  --canvas: #f5f7fb;
+  --border: #e3e8f0;
+  --input-border: #8592a6;
+  --success-text: #236344;
+  --success-surface: #edf7f0;
+  --success-border: #cbe4d4;
+  --danger-text: #983b2c;
+  --danger-surface: #fff2ee;
+  --danger-border: #edc9be;
+  --focus: #bc6a13;
+  --radius: 12px;
+  --radius-control: 8px;
+  --shadow-card: 0 4px 18px #14243d08;
+}
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  color: var(--ink);
+  font-size: 27px;
+  font-weight: 750;
+  letter-spacing: -1.2px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.wordmark-work {
+  font-weight: 450;
+}
+.wordmark-period {
+  color: var(--action);
+  font-weight: 800;
+}
+.wordmark-inverse {
+  color: var(--inverse);
+}
+.wordmark-inverse .wordmark-period {
+  color: #91b4ff;
+}
