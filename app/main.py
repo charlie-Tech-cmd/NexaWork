@@ -17,6 +17,7 @@ from app.api.routes.user_roles import router as user_roles_router
 from app.api.routes.admin import router as admin_router
 from app.api.routes.users import router as users_router
 from app.api.routes.teams import router as teams_router
+from app.api.routes.messaging import router as messaging_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.middleware import (
@@ -64,6 +65,7 @@ app.include_router(regions_router)
 app.include_router(branches_router)
 app.include_router(departments_router)
 app.include_router(teams_router)
+app.include_router(messaging_router)
 app.include_router(employees_router)
 app.include_router(roles_router)
 app.include_router(permissions_router)

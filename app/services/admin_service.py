@@ -36,8 +36,9 @@ def get_admin_dashboard_overview(
 
     total_departments = db.scalar(
         select(func.count(Department.id))
+        .join(Branch, Department.branch_id == Branch.id)
         .where(
-            Department.organization_id == organization_id
+            Branch.organization_id == organization_id
         )
     )
 

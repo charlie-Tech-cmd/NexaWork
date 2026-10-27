@@ -1,6 +1,16 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DDL,
+    DateTime,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    event,
+)
+
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -10,6 +20,11 @@ class User(Base):
     __tablename__ = "users"
 
     __table_args__ = (
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            name="uq_users_id_organization",
+        ),
         CheckConstraint(
             """
             (
@@ -67,3 +82,30 @@ class User(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+
+event.listen(
+    User.__table__,
+    "after_create",
+    DDL(
+        """
+        CREATE TRIGGER trg_users_protect_audited_identity
+        BEFORE UPDATE OF organization_id, is_super_admin ON users
+        WHEN (
+            OLD.organization_id IS NOT NEW.organization_id
+            OR OLD.is_super_admin IS NOT NEW.is_super_admin
+        )
+        AND EXISTS (
+            SELECT 1
+            FROM audit_logs
+            WHERE user_id = OLD.id
+        )
+        BEGIN
+            SELECT RAISE(
+                ABORT,
+                'cannot change identity scope after audit records exist'
+            );
+        END;
+        """
+    ).execute_if(dialect="sqlite"),
+)

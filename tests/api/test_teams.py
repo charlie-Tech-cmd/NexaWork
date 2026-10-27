@@ -1813,3 +1813,246 @@ def test_team_access_rejects_inactive_hierarchy(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Team not found"}
+
+
+def test_create_team_rejects_branch_owned_by_another_organization(
+    client,
+    db_session,
+):
+    organization_a = Organization(
+        name="Team Branch Owner",
+        slug="team-branch-owner",
+    )
+    organization_b = Organization(
+        name="Team Region Owner",
+        slug="team-region-owner",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    region_b = Region(
+        organization_id=organization_b.id,
+        name="Organization B Region",
+        slug="team-mismatched-region",
+    )
+    db_session.add(region_b)
+    db_session.flush()
+
+    branch_a = Branch(
+        organization_id=organization_a.id,
+        region_id=region_b.id,
+        name="Organization A Branch",
+        slug="team-mismatched-branch",
+    )
+    db_session.add(branch_a)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch_a.id,
+        name="Protected Department",
+        slug="team-protected-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user_b = User(
+        organization_id=organization_b.id,
+        email="team.region.owner@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization B User",
+        is_active=True,
+    )
+    db_session.add(user_b)
+    db_session.flush()
+
+    permission = Permission(
+        name="TEAM_CREATE",
+        description="Create teams",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization_b.id,
+        name="Team Creator",
+        description="Can create teams",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user_b.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "team.region.owner@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    response = client.post(
+        f"/api/v1/teams/departments/{department.id}",
+        headers={
+            "Authorization": (
+                f"Bearer {login_response.json()['access_token']}"
+            )
+        },
+        json={
+            "department_id": department.id,
+            "name": "Unauthorized Team",
+            "slug": "unauthorized-team",
+        },
+    )
+
+    assert response.status_code == 404
+
+def test_list_teams_pagination_is_bounded_ordered_and_validated(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Team Pagination Organization",
+        slug="team-pagination-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    region = Region(
+        organization_id=organization.id,
+        name="Team Pagination Region",
+        slug="team-pagination-region",
+    )
+    db_session.add(region)
+    db_session.flush()
+
+    branch = Branch(
+        organization_id=organization.id,
+        region_id=region.id,
+        name="Team Pagination Branch",
+        slug="team-pagination-branch",
+    )
+    db_session.add(branch)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch.id,
+        name="Team Pagination Department",
+        slug="team-pagination-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    teams = [
+        Team(
+            department_id=department.id,
+            name=f"Pagination Team {index:03d}",
+            slug=f"pagination-team-{index:03d}",
+        )
+        for index in range(104)
+    ]
+    db_session.add_all(teams)
+
+    user = User(
+        organization_id=organization.id,
+        email="team.pagination@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Team Pagination User",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    permission = db_session.scalar(
+        select(Permission).where(Permission.name == "TEAM_VIEW")
+    )
+    if permission is None:
+        permission = Permission(
+            name="TEAM_VIEW",
+            description="View teams",
+        )
+        db_session.add(permission)
+        db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="Team Pagination Viewer",
+        description="Can view teams for pagination tests",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=role.id,
+        )
+    )
+    db_session.flush()
+
+    expected_ids = sorted(team.id for team in teams)
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "team.pagination@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    headers = {
+        "Authorization": f"Bearer {login_response.json()['access_token']}"
+    }
+    url = f"/api/v1/teams/departments/{department.id}"
+
+    default_response = client.get(url, headers=headers)
+    assert default_response.status_code == 200
+    assert len(default_response.json()) == 50
+    assert [team["id"] for team in default_response.json()] == expected_ids[:50]
+
+    maximum_response = client.get(
+        url,
+        params={"limit": 100},
+        headers=headers,
+    )
+    assert maximum_response.status_code == 200
+    assert len(maximum_response.json()) == 100
+    assert [team["id"] for team in maximum_response.json()] == expected_ids[:100]
+
+    offset_response = client.get(
+        url,
+        params={"limit": 20, "offset": 50},
+        headers=headers,
+    )
+    assert offset_response.status_code == 200
+    assert [team["id"] for team in offset_response.json()] == expected_ids[50:70]
+
+    for params in (
+        {"limit": 0},
+        {"limit": 101},
+        {"offset": -1},
+    ):
+        response = client.get(url, params=params, headers=headers)
+        assert response.status_code == 422

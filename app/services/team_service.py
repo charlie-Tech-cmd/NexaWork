@@ -24,6 +24,7 @@ def create_team(
             Department.is_active.is_(True),
             Branch.is_active.is_(True),
             Region.is_active.is_(True),
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
         )
     )
@@ -52,6 +53,8 @@ def list_teams(
     db: Session,
     organization_id: int,
     department_id: int,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[Team]:
     department = db.scalar(
         select(Department)
@@ -62,6 +65,7 @@ def list_teams(
             Department.is_active.is_(True),
             Branch.is_active.is_(True),
             Region.is_active.is_(True),
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
         )
     )
@@ -76,6 +80,8 @@ def list_teams(
             Team.is_active.is_(True),
         )
         .order_by(Team.id)
+        .offset(offset)
+        .limit(limit)
     ).all()
 
 
@@ -97,6 +103,7 @@ def update_team(
             Department.is_active.is_(True),
             Branch.is_active.is_(True),
             Region.is_active.is_(True),
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
         )
     )
@@ -139,6 +146,7 @@ def get_team(
             Department.is_active.is_(True),
             Branch.is_active.is_(True),
             Region.is_active.is_(True),
+            Branch.organization_id == organization_id,
             Region.organization_id == organization_id,
         )
     )

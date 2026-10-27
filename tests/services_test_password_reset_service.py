@@ -153,3 +153,49 @@ def test_reset_password_rejects_expired_token(db_session):
             raw_token,
             "NewSecurePassword123!",
         )
+
+
+def test_reset_password_rejects_token_when_atomic_claim_fails(
+    db_session,
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from sqlalchemy.orm import Session
+
+    user = create_test_user(db_session)
+    raw_token, reset_token = create_password_reset_token(
+        db_session,
+        user,
+    )
+    original_password_hash = user.password_hash
+    original_token_version = user.token_version
+
+    class FailedClaimSession:
+        def __init__(self, session):
+            self.session = session
+
+        def query(self, *args, **kwargs):
+            return self.session.query(*args, **kwargs)
+
+        def get(self, *args, **kwargs):
+            return self.session.get(*args, **kwargs)
+
+        def execute(self, *args, **kwargs):
+            return SimpleNamespace(rowcount=0)
+
+        def flush(self):
+            return self.session.flush()
+
+    failed_claim_session = FailedClaimSession(db_session)
+
+    with pytest.raises(ValueError, match="Invalid or expired"):
+        reset_password(
+            failed_claim_session,
+            raw_token,
+            "NewSecurePassword123!",
+        )
+
+    assert user.password_hash == original_password_hash
+    assert user.token_version == original_token_version
+    assert reset_token.used_at is None

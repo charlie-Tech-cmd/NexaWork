@@ -1,6 +1,12 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -14,6 +20,11 @@ class Region(Base):
             "organization_id",
             "slug",
             name="uq_regions_organization_slug",
+        ),
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            name="uq_regions_id_organization",
         ),
     )
 

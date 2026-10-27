@@ -51,6 +51,8 @@ def get_region(
 def list_regions(
     db: Session,
     organization_id: int,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[Region]:
     return db.scalars(
         select(Region)
@@ -59,6 +61,8 @@ def list_regions(
             Region.is_active.is_(True),
         )
         .order_by(Region.id)
+        .offset(offset)
+        .limit(limit)
     ).all()
 
 

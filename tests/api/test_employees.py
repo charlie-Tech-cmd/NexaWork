@@ -11,7 +11,11 @@ from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
 from app.models.region import Region
 from app.models.user import User
-from app.services.admin_employee_service import update_employee
+from app.services.admin_employee_service import (
+    get_employee,
+    list_department_employees,
+    update_employee,
+)
 from sqlalchemy import select
 
 
@@ -1914,6 +1918,19 @@ def test_list_department_employees_excludes_employee_from_another_organization(
     db_session.add_all([user_a, user_b])
     db_session.flush()
 
+    additional_users = [
+        User(
+            organization_id=organization_a.id,
+            email=f"employee.list.pagination.{index}@example.com",
+            password_hash=user_a.password_hash,
+            full_name=f"Pagination Employee {index}",
+            is_active=True,
+        )
+        for index in range(104)
+    ]
+    db_session.add_all(additional_users)
+    db_session.flush()
+
     permission = Permission(
         name="EMPLOYEE_VIEW",
         description="View employees",
@@ -1961,8 +1978,26 @@ def test_list_department_employees_excludes_employee_from_another_organization(
         job_title="Developer",
     )
 
-    db_session.add_all([employee_a, employee_b])
+    additional_employees = [
+        Employee(
+            organization_id=organization_a.id,
+            user_id=user.id,
+            employee_id=f"EMP-LIST-PAGINATION-{index:03d}",
+            branch_id=branch_a.id,
+            department_id=department_a.id,
+            job_title="Developer",
+        )
+        for index, user in enumerate(additional_users)
+    ]
+
+    db_session.add_all(
+        [employee_a, employee_b, *additional_employees]
+    )
     db_session.commit()
+
+    expected_employee_ids = sorted(
+        [employee_a.id, *(employee.id for employee in additional_employees)]
+    )
 
     login_response = client.post(
         "/api/v1/auth/login",
@@ -1982,10 +2017,39 @@ def test_list_department_employees_excludes_employee_from_another_organization(
     )
 
     assert response.status_code == 200
+    assert [
+        employee["id"] for employee in response.json()
+    ] == expected_employee_ids[:50]
 
-    response_data = response.json()
+    max_page_response = client.get(
+        f"/api/v1/employees/departments/{department_a.id}?limit=100",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert max_page_response.status_code == 200
+    assert [
+        employee["id"] for employee in max_page_response.json()
+    ] == expected_employee_ids[:100]
 
-    assert [employee["id"] for employee in response_data] == [employee_a.id]
+    offset_response = client.get(
+        f"/api/v1/employees/departments/{department_a.id}?limit=20&offset=50",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert offset_response.status_code == 200
+    assert [
+        employee["id"] for employee in offset_response.json()
+    ] == expected_employee_ids[50:70]
+
+    excessive_limit_response = client.get(
+        f"/api/v1/employees/departments/{department_a.id}?limit=101",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert excessive_limit_response.status_code == 422
+
+    negative_offset_response = client.get(
+        f"/api/v1/employees/departments/{department_a.id}?offset=-1",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert negative_offset_response.status_code == 422
 
 
 def test_list_department_employees_excludes_inactive_employee(
@@ -2712,3 +2776,238 @@ def test_update_employee_requires_department_when_changing_branches(
     db_session.refresh(employee)
     assert employee.branch_id == current_branch.id
     assert employee.department_id == current_department.id
+
+
+def test_create_employee_rejects_branch_region_organization_mismatch(
+    client,
+    db_session,
+):
+    organization_a = Organization(
+        name="Employee Branch Owner",
+        slug="employee-branch-owner",
+    )
+    organization_b = Organization(
+        name="Employee Region Owner",
+        slug="employee-region-owner",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    region_b = Region(
+        organization_id=organization_b.id,
+        name="Employee Organization B Region",
+        slug="employee-mismatch-region",
+    )
+    db_session.add(region_b)
+    db_session.flush()
+
+    branch_a = Branch(
+        organization_id=organization_a.id,
+        region_id=region_b.id,
+        name="Employee Organization A Branch",
+        slug="employee-mismatch-branch",
+    )
+    db_session.add(branch_a)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch_a.id,
+        name="Employee Protected Department",
+        slug="employee-mismatch-department",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user_b = User(
+        organization_id=organization_b.id,
+        email="employee.mismatch.b@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Employee Organization B User",
+        is_active=True,
+    )
+    db_session.add(user_b)
+    db_session.flush()
+
+    permission = Permission(
+        name="EMPLOYEE_CREATE",
+        description="Create employees",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization_b.id,
+        name="Employee Creator",
+        description="Can create employees",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user_b.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "employee.mismatch.b@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    response = client.post(
+        "/api/v1/employees",
+        json={
+            "user_id": user_b.id,
+            "employee_id": "MISMATCH-EMP-001",
+            "branch_id": branch_a.id,
+            "department_id": department.id,
+            "job_title": "Unauthorized Employee",
+        },
+        headers={
+            "Authorization": (
+                f"Bearer {login_response.json()['access_token']}"
+            )
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Branch not found"}
+
+    created_employee = db_session.scalar(
+        select(Employee).where(
+            Employee.employee_id == "MISMATCH-EMP-001"
+        )
+    )
+    assert created_employee is None
+
+
+def _create_mismatched_employee_hierarchy(db_session, suffix):
+    """Create an employee whose branch and region belong to different organizations."""
+    organization_a = Organization(
+        name=f"Mismatch Organization A {suffix}",
+        slug=f"mismatch-org-a-{suffix}",
+    )
+    organization_b = Organization(
+        name=f"Mismatch Organization B {suffix}",
+        slug=f"mismatch-org-b-{suffix}",
+    )
+    db_session.add_all([organization_a, organization_b])
+    db_session.flush()
+
+    # The region belongs to A, but the branch itself belongs to B.
+    region_a = Region(
+        organization_id=organization_a.id,
+        name=f"Mismatch Region A {suffix}",
+        slug=f"mismatch-region-a-{suffix}",
+    )
+    db_session.add(region_a)
+    db_session.flush()
+
+    branch_b = Branch(
+        organization_id=organization_b.id,
+        region_id=region_a.id,
+        name=f"Mismatch Branch B {suffix}",
+        slug=f"mismatch-branch-b-{suffix}",
+    )
+    db_session.add(branch_b)
+    db_session.flush()
+
+    department = Department(
+        branch_id=branch_b.id,
+        name=f"Mismatch Department {suffix}",
+        slug=f"mismatch-department-{suffix}",
+    )
+    db_session.add(department)
+    db_session.flush()
+
+    user_a = User(
+        organization_id=organization_a.id,
+        email=f"mismatch-user-{suffix}@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name=f"Mismatch User {suffix}",
+        is_active=True,
+    )
+    db_session.add(user_a)
+    db_session.flush()
+
+    employee = Employee(
+        organization_id=organization_a.id,
+        user_id=user_a.id,
+        employee_id=f"MISMATCH-{suffix}",
+        branch_id=branch_b.id,
+        department_id=department.id,
+        job_title="Developer",
+    )
+    db_session.add(employee)
+    db_session.commit()
+    db_session.refresh(employee)
+
+    return organization_a, branch_b, department, employee
+
+
+def test_get_employee_rejects_branch_region_organization_mismatch(
+    db_session,
+):
+    organization, _, _, employee = (
+        _create_mismatched_employee_hierarchy(db_session, "get")
+    )
+
+    with pytest.raises(ValueError, match="Employee not found"):
+        get_employee(
+            db=db_session,
+            organization_id=organization.id,
+            employee_id=employee.id,
+        )
+
+
+def test_update_employee_rejects_branch_region_organization_mismatch(
+    db_session,
+):
+    organization, _, _, employee = (
+        _create_mismatched_employee_hierarchy(db_session, "update")
+    )
+    original_job_title = employee.job_title
+
+    with pytest.raises(ValueError, match="Employee not found"):
+        update_employee(
+            db=db_session,
+            organization_id=organization.id,
+            employee_id=employee.id,
+            employee_id_value=None,
+            branch_id=None,
+            department_id=None,
+            job_title="Unauthorized Change",
+            profile_picture=None,
+            is_active=None,
+        )
+
+    db_session.refresh(employee)
+    assert employee.job_title == original_job_title
+
+
+def test_list_department_employees_rejects_branch_region_organization_mismatch(
+    db_session,
+):
+    organization, _, department, _ = (
+        _create_mismatched_employee_hierarchy(db_session, "list")
+    )
+
+    with pytest.raises(ValueError, match="Department not found"):
+        list_department_employees(
+            db=db_session,
+            organization_id=organization.id,
+            department_id=department.id,
+        )

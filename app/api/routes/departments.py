@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -85,6 +85,8 @@ async def get_department(
 )
 async def list_departments(
     branch_id: int,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     current_organization: Organization = Depends(get_current_organization),
     current_user: User = Depends(require_permission("DEPARTMENT_VIEW")),
     db: Session = Depends(get_db),
@@ -94,12 +96,15 @@ async def list_departments(
             db,
             current_organization.id,
             branch_id,
+            limit,
+            offset,
         )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         )
+
 
 
 @router.put(

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -62,6 +62,8 @@ async def create_role(
     response_model=list[RoleResponse],
 )
 async def list_roles(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(require_permission("ROLE_VIEW")),
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
@@ -69,6 +71,8 @@ async def list_roles(
     return list_roles_service(
         db,
         current_organization.id,
+        limit=limit,
+        offset=offset,
     )
 
 

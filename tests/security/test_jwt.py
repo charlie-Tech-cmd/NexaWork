@@ -58,3 +58,22 @@ def test_create_access_token_preserves_auth_type():
 
     assert payload["sub"] == "123"
     assert payload["auth_type"] == "admin"
+
+
+@pytest.mark.parametrize("missing_claim", ["sub", "exp", "token_version"])
+def test_decode_access_token_rejects_missing_required_claim(missing_claim):
+    payload = {
+        "sub": "123",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
+        "token_version": 0,
+    }
+    payload.pop(missing_claim)
+
+    token = jwt.encode(
+        payload,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    with pytest.raises(ValueError, match="Invalid or expired token"):
+        decode_access_token(token)

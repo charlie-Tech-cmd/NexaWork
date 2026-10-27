@@ -1,3 +1,7 @@
+from unittest.mock import patch
+
+import pytest
+
 from app.core.security.password import hash_password
 from app.models.organization import Organization
 from app.models.user import User
@@ -6,6 +10,7 @@ from sqlalchemy import select
 from app.models.role import Role
 from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
+from app.models.audit_log import AuditLog
 
 
 def test_list_users_rejects_user_without_permission(client, db_session):
@@ -464,6 +469,177 @@ def test_create_user_assigns_authenticated_users_organization(
 
     assert created_user is not None
     assert created_user.organization_id == organization.id
+
+    audit_log = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "USER_CREATE",
+            AuditLog.resource_type == "user",
+            AuditLog.resource_id == created_user.id,
+        )
+    )
+
+    assert audit_log is not None
+    assert audit_log.organization_id == organization.id
+    assert audit_log.user_id == admin.id
+    assert audit_log.actor_organization_id == organization.id
+
+
+def test_update_user_records_audit_event(client, db_session):
+    organization = Organization(
+        name="User Update Audit Organization",
+        slug="user-update-audit-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    permission = Permission(
+        name="USER_UPDATE",
+        description="Update users",
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    role = Role(
+        organization_id=organization.id,
+        name="User Updater",
+        is_active=True,
+    )
+    db_session.add(role)
+    db_session.flush()
+
+    admin = User(
+        organization_id=organization.id,
+        email="user.updater@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="User Updater",
+        is_active=True,
+    )
+    target = User(
+        organization_id=organization.id,
+        email="user.to.update@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Original Name",
+        is_active=True,
+    )
+    db_session.add_all([admin, target])
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=admin.id,
+            role_id=role.id,
+        )
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "user.updater@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    access_token = login_response.json()["access_token"]
+
+    response = client.put(
+        f"/api/v1/users/{target.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"full_name": "Updated Name"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["full_name"] == "Updated Name"
+
+    audit_log = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "USER_UPDATE",
+            AuditLog.resource_type == "user",
+            AuditLog.resource_id == target.id,
+        )
+    )
+
+    assert audit_log is not None
+    assert audit_log.organization_id == organization.id
+    assert audit_log.user_id == admin.id
+    assert audit_log.actor_organization_id == organization.id
+
+
+@pytest.mark.parametrize("failing_operation", ["add", "commit"])
+def test_update_user_rolls_back_when_audit_write_fails(
+    db_session,
+    failing_operation,
+):
+    organization = Organization(
+        name="User Update Rollback Organization",
+        slug="user-update-rollback-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    actor = User(
+        organization_id=organization.id,
+        email="rollback.actor@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Rollback Actor",
+        is_active=True,
+    )
+    target = User(
+        organization_id=organization.id,
+        email="rollback.target@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Original Name",
+        is_active=True,
+    )
+    db_session.add_all([actor, target])
+    db_session.commit()
+
+    from app.services.user_service import update_user
+
+    with patch.object(
+        db_session,
+        failing_operation,
+        side_effect=RuntimeError(
+            f"Simulated audit {failing_operation} failure"
+        ),
+    ):
+        with pytest.raises(
+            RuntimeError,
+            match=f"Simulated audit {failing_operation} failure",
+        ):
+            update_user(
+                db=db_session,
+                user_id=target.id,
+                organization_id=organization.id,
+                actor_user_id=actor.id,
+                email=None,
+                full_name="Updated Name",
+                is_active=None,
+            )
+
+    db_session.expire_all()
+
+    persisted_user = db_session.scalar(
+        select(User).where(User.id == target.id)
+    )
+    assert persisted_user is not None
+    assert persisted_user.full_name == "Original Name"
+
+    audit_log = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "USER_UPDATE",
+            AuditLog.resource_id == target.id,
+        )
+    )
+    assert audit_log is None
+
 
 
 def test_update_user_rejects_user_from_another_organization(

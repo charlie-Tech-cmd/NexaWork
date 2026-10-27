@@ -1568,3 +1568,125 @@ def test_admin_can_remove_admin_access_with_admin_token(client, db_session):
         role_permissions.c.permission_id == admin_permission.id,
     )).first()
     assert assignment is None
+
+
+def test_list_roles_supports_bounded_pagination(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Role Pagination Organization",
+        slug="role-pagination-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    permission = Permission(
+        name="ROLE_VIEW",
+        description="View roles",
+        is_active=True,
+    )
+    db_session.add(permission)
+    db_session.flush()
+
+    manager_role = Role(
+        organization_id=organization.id,
+        name="Pagination Role Viewer",
+        description="Can view roles",
+        is_active=True,
+    )
+    db_session.add(manager_role)
+    db_session.flush()
+
+    target_roles = [
+        Role(
+            organization_id=organization.id,
+            name=f"Pagination Target Role {index:03d}",
+            description="Pagination test role",
+            is_active=True,
+        )
+        for index in range(104)
+    ]
+    db_session.add_all(target_roles)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="role.pagination.viewer@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Role Pagination Viewer",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    db_session.execute(
+        role_permissions.insert().values(
+            role_id=manager_role.id,
+            permission_id=permission.id,
+        )
+    )
+    db_session.execute(
+        user_roles.insert().values(
+            user_id=user.id,
+            role_id=manager_role.id,
+        )
+    )
+    db_session.commit()
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "role.pagination.viewer@example.com",
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    headers = {
+        "Authorization": (
+            f"Bearer {login_response.json()['access_token']}"
+        ),
+    }
+
+    expected_ids = sorted(
+        [manager_role.id, *(role.id for role in target_roles)]
+    )
+
+    default_response = client.get(
+        "/api/v1/roles",
+        headers=headers,
+    )
+    assert default_response.status_code == 200
+    default_roles = default_response.json()
+    assert len(default_roles) == 50
+    assert [role["id"] for role in default_roles] == expected_ids[:50]
+
+    maximum_response = client.get(
+        "/api/v1/roles?limit=100",
+        headers=headers,
+    )
+    assert maximum_response.status_code == 200
+    maximum_roles = maximum_response.json()
+    assert len(maximum_roles) == 100
+    assert [role["id"] for role in maximum_roles] == expected_ids[:100]
+
+    offset_response = client.get(
+        "/api/v1/roles?limit=20&offset=50",
+        headers=headers,
+    )
+    assert offset_response.status_code == 200
+    offset_roles = offset_response.json()
+    assert len(offset_roles) == 20
+    assert [role["id"] for role in offset_roles] == expected_ids[50:70]
+
+    for query in (
+        "limit=0",
+        "limit=101",
+        "offset=-1",
+    ):
+        response = client.get(
+            f"/api/v1/roles?{query}",
+            headers=headers,
+        )
+        assert response.status_code == 422, query

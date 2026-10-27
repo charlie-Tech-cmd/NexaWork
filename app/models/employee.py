@@ -1,6 +1,13 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -14,15 +21,30 @@ class Employee(Base):
             "user_id",
             name="uq_employees_user_id",
         ),
+        ForeignKeyConstraint(
+            ["user_id", "organization_id"],
+            ["users.id", "users.organization_id"],
+            name="fk_employees_user_organization",
+        ),
+        ForeignKeyConstraint(
+            ["branch_id", "organization_id"],
+            ["branches.id", "branches.organization_id"],
+            name="fk_employees_branch_organization",
+        ),
+        ForeignKeyConstraint(
+            ["department_id", "branch_id"],
+            ["departments.id", "departments.branch_id"],
+            name="fk_employees_department_branch",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
     organization_id: Mapped[int] = mapped_column(
-    ForeignKey("organizations.id"),
-    nullable=False,
-    index=True,
-)
+        ForeignKey("organizations.id"),
+        nullable=False,
+        index=True,
+    )
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"),

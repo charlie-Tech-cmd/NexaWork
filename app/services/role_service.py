@@ -34,11 +34,15 @@ def create_role(
 def list_roles(
     db: Session,
     organization_id: int,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[Role]:
     return db.scalars(
         select(Role)
         .where(Role.organization_id == organization_id)
         .order_by(Role.id)
+        .offset(offset)
+        .limit(limit)
     ).all()
 
 
