@@ -36,7 +36,7 @@ def upgrade() -> None:
     op.execute(
         """
         CREATE TRIGGER trg_audit_logs_prevent_update_delete
-        BEFORE UPDATE OR DELETE ON audit_logs
+        BEFORE UPDATE OR DELETE ON public.audit_logs
         FOR EACH ROW
         EXECUTE FUNCTION public.prevent_audit_log_mutation();
         """
@@ -49,7 +49,7 @@ def downgrade() -> None:
     op.execute(
         """
         DROP TRIGGER IF EXISTS trg_audit_logs_prevent_update_delete
-        ON audit_logs;
+        ON public.audit_logs;
         """
     )
 
