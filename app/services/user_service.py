@@ -121,6 +121,7 @@ def update_user(
     db: Session,
     user_id: int,
     organization_id: int,
+    actor_user_id: int,
     email: str | None,
     full_name: str | None,
     is_active: bool | None,
@@ -154,7 +155,19 @@ def update_user(
     if is_active is not None:
         user.is_active = is_active
 
-    db.commit()
-    db.refresh(user)
-
-    return user
+    try:
+        audit_log = AuditLog(
+            organization_id=organization_id,
+            user_id=actor_user_id,
+            actor_organization_id=organization_id,
+            action="USER_UPDATE",
+            resource_type="user",
+            resource_id=user.id,
+        )
+        db.add(audit_log)
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception:
+        db.rollback()
+        raise
