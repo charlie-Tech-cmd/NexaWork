@@ -169,10 +169,10 @@ def test_database_rejects_updating_audit_log_to_another_organization():
         engine.dispose()
 
 
-def test_database_allows_super_admin_audit_log_update_for_customer():
+def test_database_rejects_modifying_existing_audit_log():
     engine, session = _create_test_session()
     try:
-        org_a, org_b, _, _, super_admin = (
+        org_a, _, _, _, super_admin = (
             _create_organizations_and_users(session)
         )
 
@@ -180,14 +180,39 @@ def test_database_allows_super_admin_audit_log_update_for_customer():
         session.add(record)
         session.commit()
 
-        record.organization_id = org_b.id
         record.action = "BRANCH_UPDATE"
-        session.commit()
+
+        with pytest.raises(IntegrityError):
+            session.flush()
+
+        session.rollback()
 
         saved = session.query(AuditLog).one()
-        assert saved.organization_id == org_b.id
-        assert saved.user_id == super_admin.id
-        assert saved.actor_organization_id is None
+        assert saved.action == "USER_UPDATE"
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_database_rejects_deleting_existing_audit_log():
+    engine, session = _create_test_session()
+    try:
+        org_a, _, _, _, super_admin = (
+            _create_organizations_and_users(session)
+        )
+
+        record = _audit_log(org_a.id, super_admin, None)
+        session.add(record)
+        session.commit()
+
+        session.delete(record)
+
+        with pytest.raises(IntegrityError):
+            session.flush()
+
+        session.rollback()
+
+        assert session.query(AuditLog).count() == 1
     finally:
         session.close()
         engine.dispose()

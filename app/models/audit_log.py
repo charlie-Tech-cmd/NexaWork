@@ -162,3 +162,32 @@ event.listen(
         """
     ).execute_if(dialect="sqlite"),
 )
+
+
+event.listen(
+    AuditLog.__table__,
+    "after_create",
+    DDL(
+        """
+        CREATE TRIGGER trg_audit_logs_prevent_update
+        BEFORE UPDATE ON audit_logs
+        BEGIN
+            SELECT RAISE(ABORT, 'audit log records are immutable');
+        END;
+        """
+    ).execute_if(dialect="sqlite"),
+)
+
+event.listen(
+    AuditLog.__table__,
+    "after_create",
+    DDL(
+        """
+        CREATE TRIGGER trg_audit_logs_prevent_delete
+        BEFORE DELETE ON audit_logs
+        BEGIN
+            SELECT RAISE(ABORT, 'audit log records are immutable');
+        END;
+        """
+    ).execute_if(dialect="sqlite"),
+)
