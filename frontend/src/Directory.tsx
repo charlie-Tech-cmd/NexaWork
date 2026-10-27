@@ -80,7 +80,7 @@ export function Directory({ call }: { call: Call }) {
         </button>
       </PageHeading>
       {notice && (
-        <p role="status" className="notice">
+        <p role="status" className="notice success">
           {notice}
         </p>
       )}
@@ -133,7 +133,12 @@ export function Directory({ call }: { call: Call }) {
         ) : resource.error ? (
           <ErrorState message={resource.error} retry={resource.reload} />
         ) : people.length ? (
-          <div className="table-scroll">
+          <div
+            className="table-scroll"
+            role="region"
+            aria-label="People directory table"
+            tabIndex={0}
+          >
             <table>
               <caption className="sr-only">
                 People in your organization, page {offset / 20 + 1}

@@ -1,15 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Icon } from "./Icon";
+import { Wordmark } from "../Wordmark";
+import { Icon } from "../Icon";
 import { dayScenes, navigation, plannedFeatures } from "./content";
 import "./landing.css";
-function Wordmark() {
-  return (
-    <a href="/" className="landing-wordmark" aria-label="NexaWork home">
-      Nexa<span>Work</span>
-      <span className="wordmark-period">.</span>
-    </a>
-  );
-}
 function StartLink({ className = "" }: { className?: string }) {
   return (
     <a className={`landing-button ${className}`} href="/get-started">
@@ -82,7 +75,7 @@ function Navigation() {
   return (
     <header ref={header} className="landing-header">
       <div className="landing-container landing-nav">
-        <Wordmark />
+        <Wordmark className="landing-wordmark" />
         <button
           ref={toggle}
           className="landing-menu-toggle"
@@ -465,7 +458,7 @@ function Footer() {
       <div className="landing-container">
         <div className="footer-top">
           <div>
-            <Wordmark />
+            <Wordmark className="landing-wordmark" />
             <p>Connect. Collaborate. Work Smarter.</p>
             <span>A shared foundation for the modern workplace.</span>
           </div>

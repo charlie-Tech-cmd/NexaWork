@@ -68,3 +68,7 @@ license sources are recorded in `../.interface-forge/LANDING-DESIGN.md`.
 The landing page marks all unreleased collaboration features as planned and all
 illustrative interface previews as concepts. It makes no customer, metric, legal
 page or public-contact claims.
+
+## Brand system
+
+Colors and typography are shared through `src/brand.css`; `Wordmark.tsx` and `Icon.tsx` serve public and authenticated screens. Follow the [brand system and comparative research](../.interface-forge/BRAND-SYSTEM.md) for new pages. See [brand rollout validation](../docs/BRAND_ROLLOUT_REVIEW.md) for tested flows and limitations.

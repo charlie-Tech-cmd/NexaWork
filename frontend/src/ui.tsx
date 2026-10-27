@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { errorMessage } from "./api";
 export type Field = {
@@ -137,7 +138,7 @@ export function Empty({ title, text }: { title: string; text: string }) {
   return (
     <div className="empty">
       <span className="empty-symbol" aria-hidden="true">
-        ◇
+        <Icon name="structure" />
       </span>
       <h3>{title}</h3>
       <p className="muted">{text}</p>

@@ -12,7 +12,7 @@ Public routes: `/` landing, `/sign-in` login, `/get-started` organization onboar
 
 ## Blueprint alignment and product truth
 
-Blueprint sections 37–38 request modern, responsive, accessible enterprise UI. The implementation follows the existing React architecture, uses navy/blue tokens scoped to the public page, and retains existing workspace components and API boundaries.
+Blueprint sections 37–38 request modern, responsive, accessible enterprise UI. The implementation follows the existing React architecture, uses the navy/blue design direction and retains existing API boundaries. The subsequent all-page brand migration is documented in `BRAND_ROLLOUT_REVIEW.md`.
 
 Implemented: organization onboarding, people create/list/edit, organization hierarchy create/list, role creation/list/permission inspection, organization settings. Messaging is not merged into main; channels, announcements, meetings, file sharing and AI are not implemented there. All six requested feature cards say Planned, with clear section-level and hero availability notes. The workday showcase distinguishes an available foundation from planned scenes and labels its miniature interfaces “Illustrative concept · sample content.”
 

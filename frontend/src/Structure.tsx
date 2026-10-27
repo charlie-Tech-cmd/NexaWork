@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useState } from "react";
 import {
   records,
@@ -73,7 +74,7 @@ export function Structure({
         ))}
       </div>
       {notice && (
-        <p className="notice" role="status">
+        <p className="notice success" role="status">
           {notice}
         </p>
       )}
@@ -132,7 +133,13 @@ export function Structure({
               <article className="structure-card" key={item.id}>
                 <div className="card-top">
                   <span className="structure-icon" aria-hidden="true">
-                    {["◎", "⌂", "▦", "◇"][level]}
+                    <Icon
+                      name={
+                        (["globe", "building", "structure", "people"] as const)[
+                          level
+                        ]
+                      }
+                    />
                   </span>
                   <Status active={item.is_active} />
                 </div>

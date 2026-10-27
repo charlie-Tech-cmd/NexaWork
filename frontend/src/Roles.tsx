@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useState } from "react";
 import { records, type RecordData } from "./api";
 import { type Call } from "./Directory";
@@ -65,7 +66,7 @@ export function Roles({ call }: { call: Call }) {
         </button>
       </PageHeading>
       {notice && (
-        <p className="notice" role="status">
+        <p className="notice success" role="status">
           {notice}
         </p>
       )}
@@ -118,14 +119,14 @@ export function Roles({ call }: { call: Call }) {
                 aria-pressed={selected?.id === role.id}
               >
                 <span className="structure-icon" aria-hidden="true">
-                  ◇
+                  <Icon name="shield" />
                 </span>
                 <span>
                   <strong>{String(role.name)}</strong>
                   <small>{String(role.description || "No description")}</small>
                 </span>
                 <Status active={role.is_active} />
-                <span aria-hidden="true">→</span>
+                <Icon name="arrow" />
               </button>
             ))}
           </div>

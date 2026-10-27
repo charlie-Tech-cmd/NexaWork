@@ -1,3 +1,4 @@
+import { Wordmark } from "./Wordmark";
 import { useState } from "react";
 import { request, loginSession, type Session } from "./api";
 import { DataForm, type Field } from "./ui";
@@ -15,6 +16,7 @@ export function Auth({
   message: string;
   initialView?: "login" | "onboard";
 }) {
+  const [photoFailed, setPhotoFailed] = useState(false);
   const [view, setView] = useState(initialView as string);
   const [mode, setMode] = useState("member");
   const [notice, setNotice] = useState(message);
@@ -98,31 +100,35 @@ export function Auth({
   return (
     <main className="auth-layout">
       <section className="auth-story">
-        <a href="/" className="brand">
-          <span className="brand-mark">N</span>NexaWork
-          <span className="brand-dot">•</span>
-        </a>
+        <Wordmark inverse />
         <div>
           <p className="eyebrow">A PLACE TO WORK TOGETHER</p>
-          <h1>
+          <h2>
             One workspace.
             <br />
             Every part
             <br />
             of your team.
-          </h1>
+          </h2>
           <p>
             Bring your people and organization together.
             <br />A clearer way to manage the everyday.
           </p>
-          <div className="orbit" aria-hidden="true">
-            <div className="orbit-center">N</div>
-            <span>People</span>
-            <span>Teams</span>
-            <span>Places</span>
-          </div>
+          <figure className="auth-photo">
+            {!photoFailed && (
+              <img
+                src="/images/team-office-720.jpg"
+                width="720"
+                height="405"
+                alt="Colleagues collaborating around a table in a bright office"
+                loading="lazy"
+                onError={() => setPhotoFailed(true)}
+              />
+            )}
+            <figcaption>A shared space. A stronger team.</figcaption>
+          </figure>
         </div>
-        <p className="auth-footer">Connected people. Organized work.</p>
+        <p className="auth-footer">Connect. Collaborate. Work Smarter.</p>
       </section>
       <section className="auth-panel">
         <div className="auth-card">
@@ -130,7 +136,7 @@ export function Auth({
             ← Back to NexaWork
           </a>
           <p className="eyebrow">YOUR NEXAWORK WORKSPACE</p>
-          <h2>{title}</h2>
+          <h1>{title}</h1>
           <p className="muted">
             {view === "login"
               ? "Sign in to pick up where you left off."

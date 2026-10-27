@@ -1,3 +1,5 @@
+import { Wordmark } from "./Wordmark";
+import { Icon, type IconName } from "./Icon";
 import Landing from "./landing/Landing";
 import { publicView } from "./landing/content";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -14,12 +16,12 @@ import { Structure } from "./Structure";
 import { Roles } from "./Roles";
 import { DataForm, ErrorState, PageHeading, Status } from "./ui";
 import { useResource } from "./useResource";
-const navigation = [
-  { id: "overview", label: "Overview", icon: "◫" },
-  { id: "people", label: "People", icon: "♧" },
-  { id: "structure", label: "Organization", icon: "▦" },
-  { id: "roles", label: "Roles & access", icon: "◇" },
-  { id: "settings", label: "Settings", icon: "⚙" },
+const navigation: { id: string; label: string; icon: IconName }[] = [
+  { id: "overview", label: "Overview", icon: "overview" },
+  { id: "people", label: "People", icon: "people" },
+  { id: "structure", label: "Organization", icon: "structure" },
+  { id: "roles", label: "Roles & access", icon: "shield" },
+  { id: "settings", label: "Settings", icon: "settings" },
 ];
 function Overview({
   session,
@@ -51,16 +53,22 @@ function Overview({
             it.
           </p>
           <button onClick={() => navigate("structure")}>
-            Explore your organization <span>↗</span>
+            Explore your organization <Icon name="arrow" />
           </button>
         </div>
         <div className="workspace-art" aria-hidden="true">
           <span className="art-label">{String(organization.name)}</span>
           <div className="art-line" />
           <div className="art-nodes">
-            <span>◎</span>
-            <span>⌂</span>
-            <span>◇</span>
+            <span>
+              <Icon name="globe" />
+            </span>
+            <span>
+              <Icon name="building" />
+            </span>
+            <span>
+              <Icon name="people" />
+            </span>
           </div>
           <div className="art-caption">A connected workspace</div>
         </div>
@@ -70,41 +78,49 @@ function Overview({
         <span className="muted">A good place to start</span>
       </div>
       <div className="quick-grid">
-        {[
-          {
-            page: "people",
-            icon: "♧",
-            name: "Bring people together",
-            text: "Find a colleague or add someone new.",
-            action: "Open directory",
-          },
-          {
-            page: "structure",
-            icon: "▦",
-            name: "See the bigger picture",
-            text: "Explore regions, branches, departments and teams.",
-            action: "Explore organization",
-          },
-          {
-            page: "roles",
-            icon: "◇",
-            name: "Make access clear",
-            text: "See workspace roles and their permissions.",
-            action: "View roles",
-          },
-        ].map((item) => (
+        {(
+          [
+            {
+              page: "people",
+              icon: "people",
+              name: "Bring people together",
+              text: "Find a colleague or add someone new.",
+              action: "Open directory",
+            },
+            {
+              page: "structure",
+              icon: "structure",
+              name: "See the bigger picture",
+              text: "Explore regions, branches, departments and teams.",
+              action: "Explore organization",
+            },
+            {
+              page: "roles",
+              icon: "shield",
+              name: "Make access clear",
+              text: "See workspace roles and their permissions.",
+              action: "View roles",
+            },
+          ] satisfies {
+            page: string;
+            icon: IconName;
+            name: string;
+            text: string;
+            action: string;
+          }[]
+        ).map((item) => (
           <button
             className="quick-card"
             key={item.page}
             onClick={() => navigate(item.page)}
           >
             <span className="structure-icon" aria-hidden="true">
-              {item.icon}
+              <Icon name={item.icon} />
             </span>
             <h3>{item.name}</h3>
             <p className="muted">{item.text}</p>
             <span className="card-link">
-              {item.action} <span>→</span>
+              {item.action} <Icon name="arrow" />
             </span>
           </button>
         ))}
@@ -134,15 +150,16 @@ function Overview({
 function Settings({
   organization,
   call,
-  reload,
+  notice,
+  onSaved,
   session,
 }: {
   organization: RecordData;
   call: Call;
-  reload: () => void;
+  notice: string;
+  onSaved: () => void;
   session: Session;
 }) {
-  const [notice, setNotice] = useState("");
   return (
     <>
       <PageHeading
@@ -157,7 +174,7 @@ function Settings({
             Changes require organization update permission.
           </p>
           {notice && (
-            <p className="notice" role="status">
+            <p className="notice success" role="status">
               {notice}
             </p>
           )}
@@ -180,8 +197,7 @@ function Settings({
             submit="Save changes"
             onSave={async (data) => {
               await call("/organizations/me", "PATCH", data);
-              setNotice("Organization updated.");
-              reload();
+              onSaved();
             }}
           />
         </div>
@@ -213,7 +229,33 @@ function Workspace({
 }) {
   const [page, setPage] = useState("overview");
   const [menu, setMenu] = useState(false);
+  const [settingsNotice, setSettingsNotice] = useState("");
   const main = useRef<HTMLElement>(null);
+  const sidebar = useRef<HTMLElement>(null);
+  const menuToggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMenu(false);
+        menuToggle.current?.focus();
+      }
+    }
+    function closeOutside(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !sidebar.current?.contains(event.target) &&
+        !menuToggle.current?.contains(event.target)
+      )
+        setMenu(false);
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("pointerdown", closeOutside);
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("pointerdown", closeOutside);
+    };
+  }, [menu]);
   const call: Call = useCallback(
     async (path, method = "GET", body, signal) => {
       try {
@@ -234,6 +276,7 @@ function Workspace({
   function navigate(next: string) {
     setPage(next);
     setMenu(false);
+    setSettingsNotice("");
   }
   useEffect(() => {
     document.title = `${navigation.find((item) => item.id === page)?.label} · NexaWork`;
@@ -244,18 +287,20 @@ function Workspace({
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <aside className={`sidebar ${menu ? "open" : ""}`}>
-        <a
-          className="brand"
+      <aside
+        ref={sidebar}
+        id="workspace-sidebar"
+        className={`sidebar ${menu ? "open" : ""}`}
+      >
+        <Wordmark
+          inverse
           href="#overview"
+          label="NexaWork workspace overview"
           onClick={(event) => {
             event.preventDefault();
             navigate("overview");
           }}
-        >
-          <span className="brand-mark">N</span>NexaWork
-          <span className="brand-dot">•</span>
-        </a>
+        />
         <div className="workspace-picker">
           <span className="workspace-initial" aria-hidden="true">
             {String(organization.data?.name || "W").slice(0, 1)}
@@ -275,7 +320,9 @@ function Workspace({
               aria-current={page === item.id ? "page" : undefined}
               onClick={() => navigate(item.id)}
             >
-              <span aria-hidden="true">{item.icon}</span>
+              <span aria-hidden="true">
+                <Icon name={item.icon} />
+              </span>
               {item.label}
               {page === item.id && (
                 <span className="nav-indicator" aria-hidden="true">
@@ -287,7 +334,9 @@ function Workspace({
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-note">
-            <span aria-hidden="true">◎</span>
+            <span aria-hidden="true">
+              <Icon name="people" />
+            </span>
             <strong>Built around your people.</strong>
             <p>A shared space to keep everyone connected.</p>
           </div>
@@ -304,7 +353,7 @@ function Workspace({
               title="Sign out"
               onClick={() => signOut()}
             >
-              ↪
+              <Icon name="logout" />
             </button>
           </div>
         </div>
@@ -312,11 +361,13 @@ function Workspace({
       <div className="main-shell">
         <header className="topbar">
           <button
+            ref={menuToggle}
             className="mobile-toggle secondary"
+            aria-controls="workspace-sidebar"
             aria-expanded={menu}
             onClick={() => setMenu(!menu)}
           >
-            ☰ <span>Menu</span>
+            <Icon name="menu" /> <span>Menu</span>
           </button>
           <span className="topbar-location">
             Workspace <span>/</span>{" "}
@@ -325,6 +376,15 @@ function Workspace({
             </strong>
           </span>
           <div className="topbar-right">
+            <Wordmark
+              className="mobile-wordmark"
+              href="#overview"
+              label="NexaWork workspace overview"
+              onClick={(event) => {
+                event.preventDefault();
+                navigate("overview");
+              }}
+            />
             <span className="session-label">
               {session.mode === "admin"
                 ? "Admin workspace"
@@ -370,7 +430,11 @@ function Workspace({
                     session={session}
                     organization={organization.data}
                     call={call}
-                    reload={organization.reload}
+                    notice={settingsNotice}
+                    onSaved={() => {
+                      setSettingsNotice("Organization updated.");
+                      organization.reload();
+                    }}
                   />
                 )}
               </>
@@ -378,7 +442,7 @@ function Workspace({
           )}
         </main>
         <footer className="workspace-footer">
-          NexaWork <span>A workspace that brings people together.</span>
+          NexaWork <span>Connect. Collaborate. Work Smarter.</span>
         </footer>
       </div>
     </div>
@@ -420,6 +484,7 @@ export default function App() {
   if (view === "not-found")
     return (
       <main className="landing-not-found">
+        <Wordmark />
         <h1>Page not found.</h1>
         <p>This page is not part of your workspace.</p>
         <a href="/">Back to NexaWork</a>

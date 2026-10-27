@@ -15,7 +15,7 @@ Dribbble reference research:
 - Colors: navy #14243d, action #275ee8, body #5e697b, subdued text #627087, soft surface #f5f7fb, white.
 - System sans-serif fonts, no external font requests. Fluid headline; readable body text; compact metadata labels.
 - Container max 1224px; 48px desktop side space, reduced on small screens. Two-column hero, three-column feature grid → two → one.
-- Scoped `.landing-*` styles preserve workspace styling. Reusable SVG icons, button links, responsive photo component, concept preview and availability badge.
+- Scoped `.landing-*` layouts consume the shared brand tokens. The subsequent all-page migration is documented in `BRAND-SYSTEM.md`. Reusable SVG icons, button links, responsive photo component, concept preview and availability badge.
 - Anchors for sections; real /sign-in and /get-started entries; /workspace requires an in-memory session. History navigation handled without a router dependency.
 - Mobile menu is a disclosure (not a modal), supports Escape with focus restoration, and closes on selection/outside click. Native links/buttons and focus outlines throughout.
 - Concept previews are labeled sample content, never represented as screenshots. Workday accordion changes the illustrated story and uses aria-expanded/aria-controls.

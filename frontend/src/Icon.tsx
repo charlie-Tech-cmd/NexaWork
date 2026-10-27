@@ -10,8 +10,48 @@ export type IconName =
   | "shield"
   | "check"
   | "globe"
-  | "chevron";
+  | "chevron"
+  | "overview"
+  | "structure"
+  | "building"
+  | "settings"
+  | "menu"
+  | "logout";
 const paths: Record<IconName, React.ReactNode> = {
+  overview: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </>
+  ),
+  structure: (
+    <>
+      <rect x="8" y="2" width="8" height="6" rx="1" />
+      <path d="M12 8v5M5 16v-3h14v3" />
+      <rect x="2" y="16" width="6" height="6" rx="1" />
+      <rect x="16" y="16" width="6" height="6" rx="1" />
+    </>
+  ),
+  building: (
+    <>
+      <path d="M4 21V3h12v18M16 9h4v12M2 21h20M8 7h4M8 11h4M8 15h4M9 21v-3h2v3" />
+    </>
+  ),
+  settings: (
+    <>
+      <path d="M3 7h9m6 0h3M3 17h3m6 0h9" />
+      <circle cx="15" cy="7" r="3" />
+      <circle cx="9" cy="17" r="3" />
+    </>
+  ),
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  logout: (
+    <>
+      <path d="M10 3H4v18h6M10 12h11m-5-5 5 5-5 5" />
+    </>
+  ),
   arrow: (
     <>
       <path d="M5 12h14M13 6l6 6-6 6" />
