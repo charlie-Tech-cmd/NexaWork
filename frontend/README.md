@@ -53,3 +53,18 @@ The tests cover the HTTP boundary and hierarchy contracts. Browser checks agains
 `npm run build` produces `dist/`. Serve it over HTTPS and reverse-proxy `/api/*` to FastAPI on the same origin. `vite preview` previews static assets only and does not provide the development API proxy. Configure restrictive CSP and other response security headers in the hosting layer; the frontend needs same-origin scripts/styles/connect requests and no third-party resources. Do not expose the development server in production.
 
 Rollback is removal of the separately hosted frontend bundle; no backend schemas or migrations change.
+
+## Public landing page
+
+`/` is the modern-office landing page. `/sign-in` opens login, `/get-started`
+opens the existing organization onboarding form, and `/workspace` requires a
+session. Refreshing a protected workspace returns to sign-in. Unknown URLs show
+a not-found page. Production hosting must serve `index.html` for these client
+routes while forwarding `/api/*` to FastAPI.
+
+Office photos are self-hosted in `public/images` with responsive sources, lazy
+loading below the fold, alt text and an image-error fallback. Attribution and
+license sources are recorded in `../.interface-forge/LANDING-DESIGN.md`.
+The landing page marks all unreleased collaboration features as planned and all
+illustrative interface previews as concepts. It makes no customer, metric, legal
+page or public-contact claims.

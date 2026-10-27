@@ -1,3 +1,5 @@
+import Landing from "./landing/Landing";
+import { publicView } from "./landing/content";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiError,
@@ -385,14 +387,50 @@ function Workspace({
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [message, setMessage] = useState("");
+  const [path, setPath] = useState(window.location.pathname);
+  const view = publicView(path);
+  useEffect(() => {
+    const handlePop = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }, []);
+  useEffect(() => {
+    if (view === "workspace" && !session) {
+      window.history.replaceState(null, "", "/sign-in");
+      setPath("/sign-in");
+    }
+    if (view === "login") document.title = "Sign In · NexaWork";
+    if (view === "onboard") document.title = "Create Your Workspace · NexaWork";
+  }, [view, session]);
   const signOut = useCallback((notice = "") => {
     setSession(null);
     setMessage(notice);
-    document.title = "NexaWork — Sign in";
+    window.history.replaceState(null, "", "/sign-in");
+    setPath("/sign-in");
   }, []);
-  return session ? (
-    <Workspace session={session} signOut={signOut} />
-  ) : (
-    <Auth onLogin={setSession} message={message} />
+  function signIn(nextSession: Session) {
+    setSession(nextSession);
+    window.history.replaceState(null, "", "/workspace");
+    setPath("/workspace");
+    window.scrollTo(0, 0);
+  }
+  if (view === "landing") return <Landing />;
+  if (view === "workspace" && session)
+    return <Workspace session={session} signOut={signOut} />;
+  if (view === "not-found")
+    return (
+      <main className="landing-not-found">
+        <h1>Page not found.</h1>
+        <p>This page is not part of your workspace.</p>
+        <a href="/">Back to NexaWork</a>
+      </main>
+    );
+  return (
+    <Auth
+      key={view}
+      onLogin={signIn}
+      message={message}
+      initialView={view === "onboard" ? "onboard" : "login"}
+    />
   );
 }

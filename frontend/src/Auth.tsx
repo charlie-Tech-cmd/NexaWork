@@ -9,11 +9,13 @@ const password: Field = {
 export function Auth({
   onLogin,
   message,
+  initialView = "login",
 }: {
   onLogin: (session: Session) => void;
   message: string;
+  initialView?: "login" | "onboard";
 }) {
-  const [view, setView] = useState("login");
+  const [view, setView] = useState(initialView as string);
   const [mode, setMode] = useState("member");
   const [notice, setNotice] = useState(message);
   const onboarding: Field[] = [
@@ -96,7 +98,7 @@ export function Auth({
   return (
     <main className="auth-layout">
       <section className="auth-story">
-        <a href="#" className="brand">
+        <a href="/" className="brand">
           <span className="brand-mark">N</span>NexaWork
           <span className="brand-dot">•</span>
         </a>
@@ -124,6 +126,9 @@ export function Auth({
       </section>
       <section className="auth-panel">
         <div className="auth-card">
+          <a className="auth-home-link" href="/">
+            ← Back to NexaWork
+          </a>
           <p className="eyebrow">YOUR NEXAWORK WORKSPACE</p>
           <h2>{title}</h2>
           <p className="muted">
