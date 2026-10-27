@@ -2,12 +2,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security.password import hash_password, verify_password
+from app.models.audit_log import AuditLog
 from app.models.user import User
 
 
 def create_user(
     db: Session,
     organization_id: int,
+    actor_user_id: int,
     email: str,
     password: str,
     full_name: str,
@@ -26,11 +28,26 @@ def create_user(
         full_name=full_name,
     )
 
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    try:
+        db.add(new_user)
+        db.flush()
 
-    return new_user
+        audit_log = AuditLog(
+            organization_id=organization_id,
+            user_id=actor_user_id,
+            actor_organization_id=organization_id,
+            action="USER_CREATE",
+            resource_type="user",
+            resource_id=new_user.id,
+        )
+        db.add(audit_log)
+
+        db.commit()
+        db.refresh(new_user)
+        return new_user
+    except Exception:
+        db.rollback()
+        raise
 
 
 def deactivate_user(

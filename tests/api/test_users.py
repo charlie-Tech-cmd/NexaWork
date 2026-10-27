@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.models.role import Role
 from app.models.role_permission import role_permissions
 from app.models.user_role import user_roles
+from app.models.audit_log import AuditLog
 
 
 def test_list_users_rejects_user_without_permission(client, db_session):
@@ -464,6 +465,19 @@ def test_create_user_assigns_authenticated_users_organization(
 
     assert created_user is not None
     assert created_user.organization_id == organization.id
+
+    audit_log = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "USER_CREATE",
+            AuditLog.resource_type == "user",
+            AuditLog.resource_id == created_user.id,
+        )
+    )
+
+    assert audit_log is not None
+    assert audit_log.organization_id == organization.id
+    assert audit_log.user_id == admin.id
+    assert audit_log.actor_organization_id == organization.id
 
 
 def test_update_user_rejects_user_from_another_organization(

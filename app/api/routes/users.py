@@ -40,6 +40,7 @@ async def create_user(
         return create_user_service(
             db=db,
             organization_id=current_user.organization_id,
+            actor_user_id=current_user.id,
             email=user_data.email,
             password=user_data.password,
             full_name=user_data.full_name,
