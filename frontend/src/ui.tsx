@@ -24,6 +24,9 @@ export function DataForm({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [visiblePasswords, setVisiblePasswords] = useState<
+    Record<string, boolean>
+  >({});
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -49,43 +52,69 @@ export function DataForm({
   return (
     <form onSubmit={save} className="data-form">
       <fieldset disabled={busy}>
-        {fields.map((field) => (
-          <label key={field.name}>
-            {field.label}
-            {field.optional && <span className="muted"> (optional)</span>}
-            {field.options ? (
-              <select
-                name={field.name}
-                defaultValue={field.value}
-                required={!field.optional}
-              >
-                {field.options.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                name={field.name}
-                type={field.type || "text"}
-                defaultValue={field.value || ""}
-                required={!field.optional}
-                minLength={field.minLength}
-                maxLength={field.maxLength || 255}
-                autoComplete={
-                  field.type === "password"
-                    ? field.name.includes("confirm") || field.minLength
-                      ? "new-password"
-                      : "current-password"
-                    : field.type === "email"
-                      ? "email"
-                      : "off"
-                }
-              />
-            )}
-          </label>
-        ))}
+        {fields.map((field) => {
+          const isPassword = field.type === "password";
+          const visible = Boolean(visiblePasswords[field.name]);
+          const input = (
+            <input
+              name={field.name}
+              type={isPassword && visible ? "text" : field.type || "text"}
+              defaultValue={field.value || ""}
+              required={!field.optional}
+              minLength={field.minLength}
+              maxLength={field.maxLength || 255}
+              autoComplete={
+                field.type === "password"
+                  ? field.name.includes("confirm") || field.minLength
+                    ? "new-password"
+                    : "current-password"
+                  : field.type === "email"
+                    ? "email"
+                    : "off"
+              }
+            />
+          );
+
+          return (
+            <label key={field.name}>
+              {field.label}
+              {field.optional && <span className="muted"> (optional)</span>}
+              {field.options ? (
+                <select
+                  name={field.name}
+                  defaultValue={field.value}
+                  required={!field.optional}
+                >
+                  {field.options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : isPassword ? (
+                <span className="password-input">
+                  {input}
+                  <button
+                    className="password-toggle"
+                    type="button"
+                    aria-label={`${visible ? "Hide" : "Show"} ${field.label.toLowerCase()}`}
+                    aria-pressed={visible}
+                    onClick={() =>
+                      setVisiblePasswords((current) => ({
+                        ...current,
+                        [field.name]: !current[field.name],
+                      }))
+                    }
+                  >
+                    <Icon name={visible ? "eye-off" : "eye"} />
+                  </button>
+                </span>
+              ) : (
+                input
+              )}
+            </label>
+          );
+        })}
         {error && (
           <div className="notice error" role="alert">
             {error}

@@ -184,6 +184,41 @@ select {
 input::placeholder {
   color: var(--muted);
 }
+.password-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.password-input input {
+  padding-right: 48px;
+}
+.password-toggle {
+  position: absolute;
+  right: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-height: 34px;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.password-toggle svg {
+  width: 19px;
+  height: 19px;
+}
+.password-toggle:hover {
+  color: var(--ink);
+}
+.password-toggle:focus-visible {
+  outline: 2px solid var(--input-border);
+  outline-offset: 2px;
+}
 .form-actions {
   display: flex;
   gap: 10px;

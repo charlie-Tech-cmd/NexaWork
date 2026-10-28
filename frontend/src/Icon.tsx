@@ -16,7 +16,9 @@ export type IconName =
   | "building"
   | "settings"
   | "menu"
-  | "logout";
+  | "logout"
+  | "eye"
+  | "eye-off";
 const paths: Record<IconName, React.ReactNode> = {
   overview: (
     <>
@@ -111,6 +113,19 @@ const paths: Record<IconName, React.ReactNode> = {
     </>
   ),
   chevron: <path d="m9 5 7 7-7 7" />,
+  eye: (
+    <>
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  "eye-off": (
+    <>
+      <path d="m3 3 18 18" />
+      <path d="M10.6 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a16 16 0 0 1-4.1 4.9M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7c1.4 0 2.7-.3 3.8-.8" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </>
+  ),
 };
 export function Icon({ name }: { name: IconName }) {
   return (
