@@ -11,10 +11,14 @@ export function Auth({
   onLogin,
   message,
   initialView = "login",
+  initialToken = "",
+  onResetSuccess,
 }: {
   onLogin: (session: Session) => void;
   message: string;
-  initialView?: "login" | "onboard";
+  initialView?: "login" | "onboard" | "reset";
+  initialToken?: string;
+  onResetSuccess?: () => void;
 }) {
   const [photoFailed, setPhotoFailed] = useState(false);
   const [view, setView] = useState(initialView as string);
@@ -49,7 +53,7 @@ export function Auth({
         ? [{ name: "email", label: "Work email", type: "email" }]
         : view === "reset"
           ? [
-              { name: "token", label: "Reset token" },
+              { name: "token", label: "Reset token", value: initialToken },
               {
                 name: "new_password",
                 label: "New password (12 characters minimum)",
@@ -86,8 +90,7 @@ export function Auth({
       );
     } else if (view === "reset") {
       await request("/auth/reset-password", "", "POST", data);
-      setNotice("Password updated. Sign in with your new password.");
-      setView("login");
+      onResetSuccess?.();
     } else {
       const path = mode === "member" ? "/auth/login" : `/auth/${mode}/login`;
       onLogin(loginSession(await request(path, "", "POST", data), mode));
@@ -142,7 +145,9 @@ export function Auth({
               ? "Sign in to pick up where you left off."
               : view === "onboard"
                 ? "Start with your organization and its first administrator."
-                : "Recover access to your workspace."}
+                : view === "reset"
+                  ? "Choose a new password to restore access to your account."
+                  : "Recover access to your workspace."}
           </p>
           {view === "login" && (
             <div className="segmented" aria-label="Sign-in type">

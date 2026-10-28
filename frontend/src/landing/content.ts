@@ -85,11 +85,16 @@ export const dayScenes = [
 ] as const;
 export function publicView(
   pathname: string,
-): "landing" | "login" | "onboard" | "workspace" | "not-found" {
+): "landing" | "login" | "onboard" | "reset" | "workspace" | "not-found" {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/") return "landing";
   if (path === "/sign-in") return "login";
   if (path === "/get-started") return "onboard";
+  if (path === "/reset-password") return "reset";
   if (path === "/workspace") return "workspace";
   return "not-found";
+}
+
+export function resetTokenFromSearch(search: string): string {
+  return new URLSearchParams(search).get("token")?.trim() || "";
 }

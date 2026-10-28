@@ -1,13 +1,25 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, stat } from "node:fs/promises";
-import { publicView } from "../src/landing/content.ts";
+import { publicView, resetTokenFromSearch } from "../src/landing/content.ts";
 
 test("public URLs resolve to distinct onboarding, login, and protected workspace views", () => {
   assert.equal(publicView("/"), "landing");
   assert.equal(publicView("/get-started"), "onboard");
   assert.equal(publicView("/sign-in"), "login");
   assert.equal(publicView("/workspace"), "workspace");
+  assert.equal(publicView("/reset-password"), "reset");
+  assert.equal(publicView("/reset-password/"), "reset");
+});
+
+test("reset token is extracted from the email link query string", () => {
+  assert.equal(resetTokenFromSearch("?token=abc123"), "abc123");
+  assert.equal(
+    resetTokenFromSearch("?source=email&token=abc%2B123"),
+    "abc+123",
+  );
+  assert.equal(resetTokenFromSearch("?source=email"), "");
+  assert.equal(resetTokenFromSearch("?token=%20%20"), "");
 });
 test("trailing slashes are accepted without mistaking unrelated routes for auth", () => {
   assert.equal(publicView("/get-started/"), "onboard");
