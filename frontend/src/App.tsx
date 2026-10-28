@@ -1,7 +1,7 @@
 import { Wordmark } from "./Wordmark";
 import { Icon, type IconName } from "./Icon";
 import Landing from "./landing/Landing";
-import { publicView } from "./landing/content";
+import { publicView, resetTokenFromSearch } from "./landing/content";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiError,
@@ -452,6 +452,9 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [message, setMessage] = useState("");
   const [path, setPath] = useState(window.location.pathname);
+  const [resetToken] = useState(() =>
+    resetTokenFromSearch(window.location.search),
+  );
   const view = publicView(path);
   useEffect(() => {
     const handlePop = () => setPath(window.location.pathname);
@@ -459,6 +462,18 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePop);
   }, []);
   useEffect(() => {
+    if (
+      view === "reset" &&
+      new URLSearchParams(window.location.search).has("token")
+    ) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("token");
+      window.history.replaceState(
+        null,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
     if (view === "workspace" && !session) {
       window.history.replaceState(null, "", "/sign-in");
       setPath("/sign-in");
@@ -495,7 +510,15 @@ export default function App() {
       key={view}
       onLogin={signIn}
       message={message}
-      initialView={view === "onboard" ? "onboard" : "login"}
+      onResetSuccess={() => {
+        setMessage("Password updated. Sign in with your new password.");
+        window.history.replaceState(null, "", "/sign-in");
+        setPath("/sign-in");
+      }}
+      initialView={
+        view === "onboard" ? "onboard" : view === "reset" ? "reset" : "login"
+      }
+      initialToken={view === "reset" ? resetToken : ""}
     />
   );
 }
