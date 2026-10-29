@@ -54,6 +54,7 @@ def deactivate_user(
     db: Session,
     user_id: int,
     organization_id: int,
+    actor_user_id: int,
     password: str,
     current_user_password_hash: str,
 ) -> User:
@@ -70,12 +71,23 @@ def deactivate_user(
     if not verify_password(password, current_user_password_hash):
         raise ValueError("Invalid password")
 
-    user.is_active = False
-
-    db.commit()
-    db.refresh(user)
-
-    return user
+    try:
+        user.is_active = False
+        audit_log = AuditLog(
+            organization_id=organization_id,
+            user_id=actor_user_id,
+            actor_organization_id=organization_id,
+            action="USER_DEACTIVATE",
+            resource_type="user",
+            resource_id=user.id,
+        )
+        db.add(audit_log)
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception:
+        db.rollback()
+        raise
 
 
 def list_users(
