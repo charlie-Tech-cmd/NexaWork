@@ -967,3 +967,123 @@ def test_list_users_pagination_is_bounded_ordered_and_tenant_scoped(
         headers=headers,
     )
     assert invalid_limit_response.status_code == 422
+
+
+def test_deactivate_user_records_audit_event(db_session):
+    from app.services.user_service import deactivate_user
+
+    organization = Organization(
+        name="User Deactivation Audit Organization",
+        slug="user-deactivation-audit-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    actor = User(
+        organization_id=organization.id,
+        email="deactivation.audit.actor@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Deactivation Actor",
+        is_active=True,
+    )
+    target = User(
+        organization_id=organization.id,
+        email="deactivation.audit.target@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Deactivation Target",
+        is_active=True,
+    )
+    db_session.add_all([actor, target])
+    db_session.commit()
+
+    result = deactivate_user(
+        db=db_session,
+        user_id=target.id,
+        organization_id=organization.id,
+        actor_user_id=actor.id,
+        password="SecurePassword123!",
+        current_user_password_hash=actor.password_hash,
+    )
+
+    assert result.is_active is False
+
+    audit_log = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "USER_DEACTIVATE",
+            AuditLog.resource_type == "user",
+            AuditLog.resource_id == target.id,
+        )
+    )
+
+    assert audit_log is not None
+    assert audit_log.organization_id == organization.id
+    assert audit_log.user_id == actor.id
+    assert audit_log.actor_organization_id == organization.id
+
+
+@pytest.mark.parametrize("failing_operation", ["add", "commit"])
+def test_deactivate_user_rolls_back_when_audit_write_fails(
+    db_session,
+    failing_operation,
+):
+    from app.services.user_service import deactivate_user
+
+    organization = Organization(
+        name=f"Deactivation Rollback {failing_operation}",
+        slug=f"deactivation-rollback-{failing_operation}",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    actor = User(
+        organization_id=organization.id,
+        email=f"deactivation.rollback.actor.{failing_operation}@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Rollback Actor",
+        is_active=True,
+    )
+    target = User(
+        organization_id=organization.id,
+        email=f"deactivation.rollback.target.{failing_operation}@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Rollback Target",
+        is_active=True,
+    )
+    db_session.add_all([actor, target])
+    db_session.commit()
+
+    with patch.object(
+        db_session,
+        failing_operation,
+        side_effect=RuntimeError(
+            f"Simulated audit {failing_operation} failure"
+        ),
+    ):
+        with pytest.raises(
+            RuntimeError,
+            match=f"Simulated audit {failing_operation} failure",
+        ):
+            deactivate_user(
+                db=db_session,
+                user_id=target.id,
+                organization_id=organization.id,
+                actor_user_id=actor.id,
+                password="SecurePassword123!",
+                current_user_password_hash=actor.password_hash,
+            )
+
+    db_session.expire_all()
+
+    persisted_user = db_session.scalar(
+        select(User).where(User.id == target.id)
+    )
+    assert persisted_user is not None
+    assert persisted_user.is_active is True
+
+    audit_log = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "USER_DEACTIVATE",
+            AuditLog.resource_id == target.id,
+        )
+    )
+    assert audit_log is None

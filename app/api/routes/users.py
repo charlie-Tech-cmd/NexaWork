@@ -97,6 +97,7 @@ async def deactivate_user(
             db=db,
             user_id=user_id,
             organization_id=current_user.organization_id,
+            actor_user_id=current_user.id,
             password=user_data.password,
             current_user_password_hash=current_user.password_hash,
         )
