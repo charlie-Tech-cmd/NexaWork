@@ -16,6 +16,28 @@ from app.models.organization import Organization
 from app.models.user import User
 
 
+def _immutable_audit_trigger_exists(db: Session) -> bool:
+    return bool(
+        db.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_trigger AS trigger
+                    JOIN pg_class AS relation
+                      ON relation.oid = trigger.tgrelid
+                    JOIN pg_namespace AS namespace
+                      ON namespace.oid = relation.relnamespace
+                    WHERE namespace.nspname = 'public'
+                      AND relation.relname = 'audit_logs'
+                      AND trigger.tgname =
+                          'trg_audit_logs_prevent_update_delete'
+                      AND NOT trigger.tgisinternal
+                )
+            """)
+        ).scalar_one()
+    )
+
+
 @pytest.mark.skipif(
     os.getenv("NEXAWORK_TEST_POSTGRES_CONCURRENCY") != "1",
     reason="Set NEXAWORK_TEST_POSTGRES_CONCURRENCY=1 to run PostgreSQL integration tests",
@@ -59,6 +81,16 @@ def test_identity_change_cannot_race_with_new_audit_record():
     update_result = {}
 
     try:
+        with session_factory() as db:
+            if (
+                _immutable_audit_trigger_exists(db)
+                and os.getenv("GITHUB_ACTIONS") != "true"
+            ):
+                pytest.fail(
+                    "Safety stop: this test commits an immutable audit record. "
+                    "Run it only against a disposable PostgreSQL database."
+                )
+
         with session_factory() as db:
             organization = Organization(
                 name=f"Audit race test {marker}",
@@ -182,15 +214,51 @@ def test_identity_change_cannot_race_with_new_audit_record():
             assert db.query(AuditLog).filter_by(user_id=user_id).count() == 1
 
     finally:
-        with session_factory() as db:
-            if user_id is not None:
-                db.execute(delete(AuditLog).where(AuditLog.user_id == user_id))
-                db.execute(delete(User).where(User.id == user_id))
-            if organization_id is not None:
-                db.execute(
-                    delete(Organization).where(
-                        Organization.id == organization_id
-                    )
+        try:
+            with session_factory() as db:
+                immutable_trigger_exists = (
+                    _immutable_audit_trigger_exists(db)
                 )
-            db.commit()
-        engine.dispose()
+
+                committed_audit_record_exists = (
+                    user_id is not None
+                    and db.query(AuditLog)
+                    .filter_by(user_id=user_id)
+                    .first()
+                    is not None
+                )
+
+                if (
+                    immutable_trigger_exists
+                    and committed_audit_record_exists
+                ):
+                    db.rollback()
+                    if os.getenv("GITHUB_ACTIONS") != "true":
+                        raise RuntimeError(
+                            "Cleanup cannot remove the committed immutable "
+                            "audit record. Use a disposable PostgreSQL database."
+                        )
+                    # CI's PostgreSQL service is disposable. Preserve the
+                    # audit record and its referenced rows; the service is
+                    # discarded when the workflow job finishes.
+                else:
+                    if user_id is not None:
+                        db.execute(
+                            delete(AuditLog).where(
+                                AuditLog.user_id == user_id
+                            )
+                        )
+                        db.execute(
+                            delete(User).where(User.id == user_id)
+                        )
+
+                    if organization_id is not None:
+                        db.execute(
+                            delete(Organization).where(
+                                Organization.id == organization_id
+                            )
+                        )
+
+                    db.commit()
+        finally:
+            engine.dispose()
