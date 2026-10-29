@@ -226,7 +226,7 @@ def get_conversation_page(limit: int = Query(50, ge=1, le=100), cursor: str | No
         rows, next_cursor = conversation_page(db, current_organization.id, current_user.id, limit, cursor)
         members = conversation_members(db, current_organization.id, [c.id for c in rows])
         return ConversationPage(
-            items=[ConversationSummary.model_validate(c).model_copy(update={"members": members[c.id]}) for c in rows],
+            items=[ConversationSummary.model_validate(c).model_copy(update={"members": [MessagingPerson.model_validate(person) for person in members[c.id]]}) for c in rows],
             next_cursor=next_cursor,
         )
     except ValueError as exc:
