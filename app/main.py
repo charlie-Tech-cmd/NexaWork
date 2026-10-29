@@ -18,11 +18,13 @@ from app.api.routes.admin import router as admin_router
 from app.api.routes.users import router as users_router
 from app.api.routes.teams import router as teams_router
 from app.api.routes.messaging import router as messaging_router
+from app.api.routes.attachments import router as attachments_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.middleware import (
     request_logging_middleware,
     security_headers_middleware,
+    private_messaging_middleware,
 )
 
 configure_logging()
@@ -49,6 +51,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Link"],
 )
 
 app.add_middleware(
@@ -58,6 +61,7 @@ app.add_middleware(
 
 app.middleware("http")(request_logging_middleware)
 app.middleware("http")(security_headers_middleware)
+app.middleware("http")(private_messaging_middleware)
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(organizations_router)
@@ -66,6 +70,7 @@ app.include_router(branches_router)
 app.include_router(departments_router)
 app.include_router(teams_router)
 app.include_router(messaging_router)
+app.include_router(attachments_router)
 app.include_router(employees_router)
 app.include_router(roles_router)
 app.include_router(permissions_router)

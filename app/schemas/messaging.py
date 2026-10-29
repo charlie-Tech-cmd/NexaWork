@@ -1,4 +1,6 @@
 from datetime import datetime
+from uuid import UUID
+from app.schemas.attachment import AttachmentResponse
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -31,6 +33,16 @@ class GroupConversationCreate(BaseModel):
 
 
 class MessageCreate(BaseModel):
+    attachment_ids: list[int] = Field(default_factory=list, max_length=10)
+    client_message_id: UUID | None = None
+
+    @field_validator("attachment_ids")
+    @classmethod
+    def validate_attachments(cls, values):
+        if any(v <= 0 for v in values) or len(set(values)) != len(values):
+            raise ValueError("Attachment IDs must be distinct positive IDs")
+        return values
+
     body: str = Field(min_length=1, max_length=10000)
 
     @field_validator("body")
@@ -63,6 +75,7 @@ class ConversationResponse(BaseModel):
 
 
 class MessageResponse(BaseModel):
+    attachments: list[AttachmentResponse] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -76,3 +89,17 @@ class MessageResponse(BaseModel):
 class MessagePage(BaseModel):
     items: list[MessageResponse]
     next_cursor: int | None
+
+
+class MessagingPerson(BaseModel):
+    id: int
+    full_name: str
+
+
+class ConversationSummary(ConversationResponse):
+    members: list[MessagingPerson] = Field(default_factory=list)
+
+
+class ConversationPage(BaseModel):
+    items: list[ConversationSummary]
+    next_cursor: str | None

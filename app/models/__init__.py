@@ -34,3 +34,4 @@ __all__ = [
     "Team",
     "PasswordResetToken",
 ]
+from app.models.attachment import Attachment

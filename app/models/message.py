@@ -7,6 +7,8 @@ from sqlalchemy import (
     Index,
     Integer,
     Text,
+    String,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,6 +19,14 @@ class Message(Base):
     __tablename__ = "messages"
 
     __table_args__ = (
+        UniqueConstraint("id", "conversation_id", "organization_id", name="uq_messages_scope"),
+        UniqueConstraint(
+            "organization_id",
+            "conversation_id",
+            "sender_id",
+            "client_message_id",
+            name="uq_messages_client_request",
+        ),
         ForeignKeyConstraint(
             ["conversation_id", "organization_id"],
             ["conversations.id", "conversations.organization_id"],
@@ -69,3 +79,6 @@ class Message(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+
+    client_message_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
