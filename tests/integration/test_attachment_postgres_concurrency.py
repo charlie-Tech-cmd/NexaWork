@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import create_engine, select, func
 from sqlalchemy.engine import URL
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from app.models.organization import Organization
 from app.models.user import User
 from app.models.message import Message
@@ -48,19 +48,11 @@ def test_competing_attachment_claims_commit_one_complete_message(monkeypatch):
             finish(db, org.id, group.id, user.id, draft.id, 5, "a" * 64, "text/plain")
             org_id, uid, cid, aid = org.id, user.id, group.id, draft.id
         barrier = threading.Barrier(2)
-        original_flush = Session.flush
-        def flush(session, *args, **kwargs):
-            synchronize = any(isinstance(
-                row,
-                Message,
-            ) for row in session.new) and not session.info.get("race_synchronized")
-            original_flush(session, *args, **kwargs)
-            if synchronize:
-                session.info["race_synchronized"] = True
-                barrier.wait(timeout=15)
-        monkeypatch.setattr(Session, "flush", flush)
         def send():
             with factory() as db:
+                # Synchronize before the transaction's serialization boundary.
+                # Waiting after flush would require both actor locks at once.
+                barrier.wait(timeout=15)
                 try:
                     return send_message(db, org_id, cid, uid, "One winning claim", [aid], str(uuid4())).id
                 except AttachmentConflict:
