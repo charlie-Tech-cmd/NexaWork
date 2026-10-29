@@ -1,6 +1,6 @@
 # NexaWork workspace frontend
 
-React + TypeScript + Vite client for the existing FastAPI backend. This package targets `main` at `a39b177`, not the unmerged messaging PR. No sample records or mock API are included in the application.
+React + TypeScript + Vite client for the existing FastAPI backend. The messaging/files slice extends main at `f808143`; deploy its matching API and additive migration before this client. No sample records or mock API are included in the application.
 
 ## Run locally
 
@@ -25,9 +25,10 @@ Sign in as a member, organization administrator, or with an employee ID. New org
 - Regions → branches → departments → teams, with parent-scoped listing and creation. Team creation includes the backend-required `department_id`.
 - Role listing, creation and inspection of assigned permissions.
 - Organization name/handle updates.
+- Direct/group conversations, paged history, private file attachments and a conversation-scoped Files view. See [setup and release gates](../docs/MESSAGING_FILES_SETUP.md).
 - Loading, empty, validation, permission-denied, network failure, retry and session-expiry states.
 
-This first frontend does not include employee-record administration, role/permission assignment, account deactivation, super-admin operations, hierarchy editing, or messaging. These remain explicit follow-on workflows, not inactive controls pretending to work. The broken admin dashboard aggregate endpoint is not used.
+This first frontend does not include employee-record administration, role/permission assignment, account deactivation, super-admin operations, hierarchy editing, websocket delivery, presence, or read receipts. These remain explicit follow-on workflows, not inactive controls pretending to work. The broken admin dashboard aggregate endpoint is not used.
 
 ## Security and integration
 
