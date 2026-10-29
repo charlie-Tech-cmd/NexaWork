@@ -2,7 +2,14 @@ import { Wordmark } from "./Wordmark";
 import { Icon, type IconName } from "./Icon";
 import Landing from "./landing/Landing";
 import { publicView, resetTokenFromSearch } from "./landing/content";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ApiError,
   record,
@@ -16,8 +23,13 @@ import { Structure } from "./Structure";
 import { Roles } from "./Roles";
 import { DataForm, ErrorState, PageHeading, Status } from "./ui";
 import { useResource } from "./useResource";
+const Messaging = lazy(() =>
+  import("./Messaging").then((module) => ({ default: module.Messaging })),
+);
 const navigation: { id: string; label: string; icon: IconName }[] = [
   { id: "overview", label: "Overview", icon: "overview" },
+  { id: "messages", label: "Messages", icon: "message" },
+  { id: "files", label: "Files", icon: "file" },
   { id: "people", label: "People", icon: "people" },
   { id: "structure", label: "Organization", icon: "structure" },
   { id: "roles", label: "Roles & access", icon: "shield" },
@@ -420,6 +432,17 @@ function Workspace({
                     navigate={navigate}
                   />
                 )}{" "}
+                {(page === "messages" || page === "files") && (
+                  <Suspense
+                    fallback={<p role="status">Opening conversations…</p>}
+                  >
+                    <Messaging
+                      session={session}
+                      signOut={signOut}
+                      initialView={page === "files" ? "files" : "messages"}
+                    />
+                  </Suspense>
+                )}
                 {page === "people" && <Directory call={call} />}{" "}
                 {page === "structure" && (
                   <Structure call={call} organization={organization.data} />
