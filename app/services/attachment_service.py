@@ -26,7 +26,7 @@ def now():
     return datetime.now(timezone.utc)
 
 
-def authorize(db: Session, org_id: int, cid: int, uid: int, *, lock=False):
+def authorize(db: Session, org_id: int, cid: int, uid: int, *, lock=False, lock_quota=False):
     user_query = select(User).where(
         User.id == uid,
         User.organization_id == org_id,
@@ -41,10 +41,16 @@ def authorize(db: Session, org_id: int, cid: int, uid: int, *, lock=False):
         ConversationMember.is_active.is_(True),
     )
     if lock:
-        user_query = user_query.with_for_update(read=True)
-        org_query = org_query.with_for_update(read=True)
+        # Acquire organization, actor, membership, then attachment locks consistently.
+        # The immutable-audit trigger takes FOR UPDATE on the actor: a shared
+        # actor lock would deadlock when concurrent audited writes upgrade it.
+        user_query = user_query.with_for_update()
+        # Quota writers serialize without blocking ordinary foreign-key reads.
+        # Take the final lock mode immediately; never upgrade a shared org lock.
+        org_query = (org_query.with_for_update(key_share=True) if lock_quota
+                     else org_query.with_for_update(read=True))
         member_query = member_query.with_for_update(read=True)
-    if db.scalar(user_query) is None or db.scalar(org_query) is None or db.scalar(member_query) is None:
+    if db.scalar(org_query) is None or db.scalar(user_query) is None or db.scalar(member_query) is None:
         raise ConversationAccessError("Conversation not found")
 
 
@@ -59,9 +65,9 @@ def storage() -> StorageService:
 
 def reserve(db: Session, org_id: int, cid: int, uid: int, filename: str) -> Attachment:
     filename = safe_filename(filename)
-    authorize(db, org_id, cid, uid)
-    # Serialize short quota reservations; never retain the lock during upload I/O.
-    db.scalar(select(Organization).where(Organization.id == org_id).with_for_update())
+    # Serialize short quota reservations before actor/attachment operations;
+    # never retain these locks during upload I/O.
+    authorize(db, org_id, cid, uid, lock=True, lock_quota=True)
     in_progress = db.scalar(select(func.count()).select_from(Attachment).where(
         Attachment.organization_id == org_id, Attachment.uploaded_by_user_id == uid,
         Attachment.status.in_(["uploading", "ready"]), Attachment.expires_at > now()))
