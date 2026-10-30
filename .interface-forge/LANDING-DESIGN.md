@@ -1,5 +1,7 @@
 # NexaWork modern office landing page
 
+> Historical design record. The current redesign, asset provenance and verification are documented in [LANDING_REDESIGN_RPI.md](../docs/LANDING_REDESIGN_RPI.md). The original photos below are retained but no longer rendered.
+
 ## Research and art direction
 
 Reviewed main `a39b177` on 2026-10-27 and blueprint sections 37–38. Existing client: React 19, TypeScript, Vite, custom CSS; no router dependency. Reuse the existing Auth/onboarding and workspace APIs. Main has no frontend; this review includes the earlier local frontend foundation commit `1c107de` as a dependency.

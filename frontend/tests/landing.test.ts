@@ -50,3 +50,17 @@ test("responsive office assets are real JPEGs under the per-image budget", async
     }
   }
 });
+
+test("conference illustration has responsive WebP variants within the image budget", async () => {
+  for (const width of [720, 1440]) {
+    const bytes = await readFile(
+      new URL(`../public/images/conference-${width}.webp`, import.meta.url),
+    );
+    assert.equal(bytes.toString("ascii", 0, 4), "RIFF");
+    assert.equal(bytes.toString("ascii", 8, 12), "WEBP");
+    assert.ok(
+      bytes.length < 150_000,
+      "Conference images must stay below 150 kB",
+    );
+  }
+});
