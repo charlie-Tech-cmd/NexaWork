@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -345,3 +346,56 @@ def test_conversation_listing_only_returns_active_memberships(
 
     visible = list_conversations(db_session, org_id, data["creator"].id)
     assert conversation.id not in {item.id for item in visible}
+
+
+def test_conversation_listing_orders_by_created_at_descending(
+    db_session, messaging_users
+):
+    data = messaging_users
+    org_id = data["organization_id"]
+    creator_id = data["creator"].id
+
+    older = create_or_get_direct_conversation(
+        db_session, org_id, creator_id, data["recipient"].id
+    )
+    newer = create_or_get_direct_conversation(
+        db_session, org_id, creator_id, data["third"].id
+    )
+
+    older.created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    newer.created_at = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    db_session.commit()
+
+    ordered = list_conversations(db_session, org_id, creator_id)
+
+    assert [item.id for item in ordered] == [newer.id, older.id]
+
+
+def test_conversation_listing_uses_id_tiebreaker_and_respects_limit(
+    db_session, messaging_users
+):
+    data = messaging_users
+    org_id = data["organization_id"]
+    creator_id = data["creator"].id
+
+    conversations = [
+        create_or_get_direct_conversation(
+            db_session, org_id, creator_id, recipient.id
+        )
+        for recipient in (data["recipient"], data["third"])
+    ]
+
+    shared_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    conversations[0].created_at = shared_time
+    conversations[1].created_at = shared_time
+    db_session.commit()
+
+    # The higher ID must appear first when timestamps are equal.
+    ordered = list_conversations(db_session, org_id, creator_id)
+    assert [item.id for item in ordered] == [
+        conversations[1].id,
+        conversations[0].id,
+    ]
+
+    limited = list_conversations(db_session, org_id, creator_id, limit=1)
+    assert [item.id for item in limited] == [conversations[1].id]
