@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Wordmark } from "../Wordmark";
 import { Icon } from "../Icon";
 import { navigation, features } from "./content";
+import { DemoConversation } from "./DemoConversation";
 import "./landing.css";
 
 function StartLink({ light = false }: { light?: boolean }) {
@@ -171,20 +172,6 @@ const sampleFiles = [
     date: "Yesterday",
   },
 ];
-function FileAttachment() {
-  return (
-    <div className="preview-attachment">
-      <span className="preview-file-icon">
-        <Icon name="file" />
-      </span>
-      <div>
-        <strong>Launch brief.pdf</strong>
-        <span>PDF document · 2.4 MB</span>
-      </div>
-      <Icon name="check" />
-    </div>
-  );
-}
 function WorkspacePreview() {
   const [tab, setTab] = useState<"messages" | "files">("messages");
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -295,58 +282,7 @@ function WorkspacePreview() {
             tabIndex={0}
             className="demo-panel"
           >
-            <div className="demo-day">
-              <span />
-              Today
-              <span />
-            </div>
-            {[
-              {
-                initials: "AO",
-                name: "Amara Okafor",
-                time: "9:41 AM",
-                tone: "blue",
-                text: "The launch brief is ready. Everything we discussed, in one place.",
-                file: true,
-              },
-              {
-                initials: "AM",
-                name: "Alex Morgan",
-                time: "9:43 AM",
-                tone: "slate",
-                text: "Love this direction. I’ll add the review notes here so we can keep the context together.",
-                file: false,
-              },
-              {
-                initials: "RS",
-                name: "Riya Shah",
-                time: "9:45 AM",
-                tone: "warm",
-                text: "All set for our next chapter.",
-                file: false,
-              },
-            ].map((message) => (
-              <div className="demo-message" key={message.name}>
-                <span className={`demo-avatar avatar-${message.tone}`}>
-                  {message.initials}
-                </span>
-                <div className="demo-message-body">
-                  <p className="demo-message-meta">
-                    <strong>{message.name}</strong>
-                    <span>{message.time}</span>
-                  </p>
-                  <p>{message.text}</p>
-                  {message.file && <FileAttachment />}
-                </div>
-              </div>
-            ))}
-            <div className="demo-composer-note">
-              <Icon name="message" />
-              <span>A conversation is where it starts.</span>
-              <a href="/sign-in" aria-label="Sign in to start a conversation">
-                <Icon name="arrow" />
-              </a>
-            </div>
+            <DemoConversation active={tab === "messages"} />
           </div>
           <div
             id="preview-panel-files"
@@ -385,7 +321,7 @@ function WorkspacePreview() {
       <figcaption>
         <span>Interactive preview · fictional people and sample content</span>
         <span>
-          Try the Messages and Files tabs <Icon name="arrow" />
+          Send a demo message or explore Files <Icon name="arrow" />
         </span>
       </figcaption>
     </figure>

@@ -74,6 +74,61 @@ const path = require("node:path");
         true,
       );
       await messages.click();
+      const composer = page.getByRole("textbox", { name: "Your demo message" });
+      const send = page.getByRole("button", {
+        name: "Send demo message",
+        exact: true,
+      });
+      const reset = page.getByRole("button", { name: "Reset demo" });
+      const log = page.getByRole("log", { name: "Demo conversation" });
+      const writes = [];
+      page.on("request", (request) => {
+        if (request.method() !== "GET") writes.push(request.url());
+      });
+      assert.equal(await send.isDisabled(), true);
+      await composer.fill("   ");
+      assert.equal(await send.isDisabled(), true);
+      await composer.fill("Hello team!");
+      await files.click();
+      await messages.click();
+      assert.equal(await composer.inputValue(), "Hello team!");
+      await send.click();
+      await log.getByText("Hello team!", { exact: true }).waitFor();
+      assert.equal(await composer.inputValue(), "");
+      await log.getByText("Demo reply", { exact: true }).waitFor();
+      assert.equal(await log.locator(".demo-message").count(), 5);
+      await composer.fill("Where are the files?");
+      await composer.press("Enter");
+      await log.getByText(/Try the Files tab above/).waitFor();
+      assert.equal(await log.locator(".demo-message").count(), 7);
+      if (width === 390) {
+        await composer.fill("First line");
+        await composer.press("Shift+Enter");
+        await composer.press("End");
+        await composer.pressSequentially("Second line");
+        assert.equal(await composer.inputValue(), "First line\nSecond line");
+        await composer.dispatchEvent("keydown", {
+          key: "Enter",
+          code: "Enter",
+          isComposing: true,
+          bubbles: true,
+        });
+        assert.equal(await log.locator(".demo-message").count(), 7);
+        assert.equal(await composer.getAttribute("maxlength"), "500");
+        await composer.fill('<img src=x onerror="alert(1)">');
+        await send.click();
+        await log
+          .getByText('<img src=x onerror="alert(1)">', { exact: true })
+          .waitFor();
+        assert.equal(await log.locator("img").count(), 0);
+        await reset.click();
+        await page.waitForTimeout(850); // Cross the reply timer deadline to detect stale replies after reset.
+        assert.equal(await log.locator(".demo-message").count(), 3);
+      }
+      await reset.click();
+      assert.equal(await composer.inputValue(), "");
+      assert.equal(await log.locator(".demo-message").count(), 3);
+      assert.deepEqual(writes, [], "Demo must not transmit messages");
       if (width <= 800) {
         const menu = page.getByRole("button", { name: "Menu" });
         await menu.click();
@@ -139,6 +194,7 @@ const path = require("node:path");
         width,
         overflow: false,
         tabs: "PASS",
+        demoMessaging: "PASS",
         navigation: "PASS",
         console: "PASS",
       });

@@ -20,7 +20,7 @@ Direction: calm, precise, human. Fluid typography, generous space, quiet borders
 - `frontend/public/images/conference-{720,1440}.webp`: 46,908/110,282 bytes, responsive sources, fixed geometry, high priority, unavailable-image fallback.
 - `frontend/tests/landing.test.ts`: WebP integrity/size budget added to existing route/asset tests.
 
-Preview tabs support pointer, arrows, Home and End. Fictional sample content is labeled explicitly. Sidebar/file entries are illustrations, not simulated send/download controls. Actual links open `/sign-in` and `/get-started`. Mobile menu supports Escape/focus restoration and selection/outside dismissal.
+Preview tabs support pointer, arrows, Home and End. Fictional sample content is labeled explicitly. Sidebar/file entries remain illustrations. The composer is now a browser-only messaging demo, described below; file entries are not download controls. Actual links open `/sign-in` and `/get-started`. Mobile menu supports Escape/focus restoration and selection/outside dismissal.
 
 Private files require administrator enablement; downloads are limited to conversation members. No presence/read-receipt/realtime, public-link, production activation, endorsement or usage-statistic claims. Channels, announcements, meetings and AI stay planned.
 
@@ -47,3 +47,11 @@ Reproducible browser smoke check: `frontend/tests/browser/landing.smoke.cjs`. Us
 ## Release boundary
 
 This redesign does not certify or activate feature infrastructure. `MESSAGING_FILES_RPI.md` and `MESSAGING_FILES_SETUP.md` limitations remain, including default-disabled uploads, scanner/storage setup and deployment verification. No backend, schema, permission, infrastructure or production-data changes. Revert this frontend commit for rollback; no migration.
+
+## Interactive messaging demo follow-up
+
+The landing preview composer now accepts up to 500 characters and appends messages to a scrollable conversation. Visitors can use the send button or Enter, insert line breaks with Shift+Enter, and switch between Messages/Files without losing the draft. IME composition Enter does not send. Empty messages are disabled. A short delay produces an explicitly labeled, scripted demo reply, with responses for greetings and file-related questions. This is not an AI service or a conversation with real people.
+
+`DemoConversation.tsx` owns isolated React state. No API, storage, analytics or authentication integration; text remains in page memory and clears on refresh. History is bounded to 40 entries. Reset clears the draft/history and cancels pending replies; unmount also cleans up the timer. The transcript has an accessible log, the composer has a label, and status changes are announced. Text renders as escaped React content, with long words/newlines handled inside the fixed-height transcript.
+
+Verification: PASS — 22 frontend tests, strict TypeScript/Vite build and formatting. The browser smoke suite now tests click/Enter sending, scripted replies, whitespace rejection, retained drafts across tabs and reset at all six widths. At 390px it additionally checks Shift+Enter, IME composition, literal rendering of HTML-like text and cancellation of pending replies after reset. No message write requests observed. Automated axe checks and all original responsive/navigation checks remain passing. Desktop/mobile demo screenshots reviewed; refresh clears messages and drafts at both sizes. Actual production messaging/files remain outside this demo test scope.

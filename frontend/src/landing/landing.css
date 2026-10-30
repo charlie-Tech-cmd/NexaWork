@@ -611,7 +611,7 @@
 .landing-page .demo-composer-note > svg {
   width: 16px;
 }
-.landing-page .demo-composer-note a {
+.landing-page .demo-composer-note button {
   margin-left: auto;
   min-width: 36px;
   min-height: 36px;
@@ -1305,7 +1305,7 @@
   .landing-page .demo-composer-note > svg {
     display: none;
   }
-  .landing-page .demo-composer-note a {
+  .landing-page .demo-composer-note button {
     min-width: 40px;
     min-height: 40px;
   }
@@ -1427,5 +1427,107 @@
     transition: none !important;
     animation: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+.landing-page .demo-history {
+  height: 290px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 3px 8px 0 3px;
+  scrollbar-width: thin;
+}
+.landing-page .demo-history .demo-message-body > p:not(.demo-message-meta) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.landing-page .demo-reply-status {
+  min-height: 30px;
+  padding-top: 10px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.landing-page .demo-composer-note {
+  margin-top: 10px;
+  padding: 8px;
+  align-items: center;
+}
+.landing-page .demo-composer-note textarea {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 8px;
+  margin: 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 56px;
+  max-height: 160px;
+  border-radius: 4px;
+}
+.landing-page .demo-composer-note textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.landing-page .demo-composer-note button {
+  border: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+}
+.landing-page .demo-composer-note button:hover:not(:disabled) {
+  background: var(--action-hover);
+}
+.landing-page .demo-composer-note button:disabled {
+  background: #e3e8f0;
+  color: #5e697b;
+  cursor: not-allowed;
+}
+.landing-page .demo-input-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.landing-page .demo-composer-help {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+  padding-top: 5px;
+}
+.landing-page .demo-character-count {
+  display: inline-block;
+  margin-left: 8px;
+}
+.landing-page .demo-composer-help button {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--action);
+  font-size: 11px;
+  min-height: 44px;
+  padding: 8px 0 8px 8px;
+}
+@media (max-width: 600px) {
+  .landing-page .demo-history {
+    height: 320px;
+  }
+  .landing-page .demo-composer-note textarea {
+    font-size: 16px;
+  }
+  .landing-page .demo-composer-help {
+    font-size: 9px;
   }
 }
