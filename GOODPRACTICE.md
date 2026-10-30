@@ -40,7 +40,7 @@ Populated from repository evidence on 2026-10-23; unresolved decisions are recor
 | --- | --- |
 | Product and owner | NexaWork; repository charlie-Tech-cmd/NexaWork. Accountable maintainer and operational contact: not confirmed. |
 | User and problem | Distributed organizations and their employees/admins; secure workplace coordination. Success metrics: not confirmed. |
-| Scope | Current backend: identity, organizations, regions, branches, departments, employees, teams and RBAC. Communication, meetings, AI and frontend remain roadmap items; inspect code for actual coverage. |
+| Scope | Current backend: identity, organizations, regions, branches, departments, employees, teams and RBAC. React workspace client added in frontend/. Communication, meetings and AI remain roadmap items; inspect code for actual coverage. |
 | Project type | FastAPI API; modular monolith. Product vision: docs/NEXAWORK_PRODUCT_SPEC.md. |
 | Risk | Sensitive employee and organization data; tenant isolation and privileged access require careful review. |
 | Stack | Python 3.12 (Docker and CI), FastAPI, SQLAlchemy, Alembic, PostgreSQL, Redis. pip with pinned requirements.txt and requirements-dev.txt; no separate lockfile. |
@@ -48,11 +48,11 @@ Populated from repository evidence on 2026-10-23; unresolved decisions are recor
 | Data | User, employee, organization and audit data. Retention, deletion and residency decisions: not confirmed. |
 | Access model | Organization tenancy, users, employees, roles, permissions, organization admins and super-admin boundaries; backend checks must enforce access. |
 | Integrations | PostgreSQL, Redis, email and storage abstractions. Provider ownership, quotas and production configuration: not confirmed. |
-| UI | No frontend package in this repository. NexaWork branding; target devices, browser matrix and accessibility acceptance criteria: not confirmed. |
+| UI | React + TypeScript + Vite workspace client in frontend/. Responsive desktop/mobile layouts; broader browser and assistive-technology acceptance remains unconfirmed. |
 | Performance | Workload, latency targets and cost budgets: not confirmed. |
 | Reliability | SLIs, SLOs, RPO and RTO: not confirmed. |
 | Environments | Local configuration via .env.example; CI uses disposable PostgreSQL and Redis. Production/staging ownership: not confirmed. |
-| Verification | python -m pip install -r requirements-dev.txt; python -m pytest -q. See .github/workflows/security.yml for pip-audit and disposable PostgreSQL migration checks. Agent-package checks: docs/AGENT_SKILLS.md. No configured formatter/linter/type-check/frontend build. |
+| Verification | python -m pip install -r requirements-dev.txt; python -m pytest -q. See .github/workflows/security.yml for pip-audit and disposable PostgreSQL migration checks. Agent-package checks: docs/AGENT_SKILLS.md. Frontend: npm run format:check, npm test, npm run build, npm audit. Backend formatter/linter remain unconfigured. |
 | Delivery | Existing security CI audits dependencies, checks migration upgrades and tests. Dockerfile present; deployment target and rollback owner: not confirmed. |
 | Authorization | Follow explicit user task scope and available access. Skill instructions grant no permissions. Merge, deployment, destructive and production actions require explicit authorization. |
 | Domain requirements | Employee-data privacy, tenant isolation, secure access and accessibility where applicable; jurisdiction and specialist obligations: not confirmed. |

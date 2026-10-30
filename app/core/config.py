@@ -18,6 +18,20 @@ class Settings(BaseSettings):
     rate_limit_ip_max_attempts: int = Field(default=30, gt=0)
     rate_limit_ip_window_seconds: int = Field(default=60, gt=0)
 
+    attachments_enabled: bool = False
+    storage_local_root: str = "./var/private-attachments"
+    persistent_local_storage: bool = False
+    attachment_max_bytes: int = Field(default=10485760, ge=1, le=52428800)
+    attachment_max_per_message: int = Field(default=10, ge=1, le=10)
+    attachment_max_drafts: int = Field(default=20, ge=1, le=100)
+    attachment_org_daily_bytes: int = Field(default=1073741824, ge=10485760)
+    attachment_upload_timeout: int = Field(default=120, ge=1, le=300)
+    file_scan_host: str = ""
+    file_scan_port: int = Field(default=3310, ge=1, le=65535)
+    file_scan_timeout: int = Field(default=30, ge=1, le=120)
+    allow_unscanned_development_files: bool = False
+    messaging_rate_limits_enabled: bool = False
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [
@@ -60,10 +74,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self):
+        if self.allow_unscanned_development_files and self.environment.strip().lower() not in {
+            "development",
+            "test",
+        }:
+            raise ValueError("Unscanned file bypass is only allowed in development/test")
         if self.environment.strip().lower() != "production":
             return self
 
         errors = []
+        if self.allow_unscanned_development_files:
+            errors.append("Unscanned file bypass is forbidden in production")
+        if self.attachments_enabled and (not self.persistent_local_storage or not self.file_scan_host or not self.messaging_rate_limits_enabled):
+            errors.append("Production files require persistent storage acknowledgement, scanner and rate limits")
 
         if self.db_host.strip().lower() in {
             "localhost",

@@ -18,3 +18,9 @@ htmlcov/
 # IDE/editor
 .vscode/
 .idea/
+# Frontend generated files
+frontend/node_modules/
+frontend/dist/
+
+# Private local file objects must never be committed.
+/var/private-attachments/

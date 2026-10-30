@@ -293,3 +293,10 @@ The MVP is being built incrementally, with each major milestone implemented, tes
 **NexaWork**
 
 *Connect. Collaborate. Work Smarter.*
+
+## Workspace frontend
+
+A React and TypeScript workspace client is available in [`frontend/`](frontend/README.md).
+It connects to the existing FastAPI API for sign-in, organization setup, people,
+organization hierarchy, roles and workspace settings. See the frontend README for
+local setup, supported workflows, backend limitations and verification commands.

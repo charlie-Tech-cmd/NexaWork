@@ -1,17 +1,16 @@
-from typing import Protocol
+"""Private streaming storage seam; authorization belongs to application services."""
+from typing import BinaryIO, Protocol
 
 
 class StorageService(Protocol):
-    def upload(
-        self,
-        file_data: bytes,
-        object_name: str,
-        content_type: str,
-    ) -> str:
+    def create(self, key: str) -> BinaryIO:
+        """Create a new private object exclusively; never overwrite an existing key."""
         ...
 
-    def delete(self, object_name: str) -> None:
+    def open(self, key: str) -> BinaryIO:
+        """Open an object for bounded reads. Caller owns closing the stream."""
         ...
 
-    def get_url(self, object_name: str) -> str:
+    def delete(self, key: str) -> None:
+        """Idempotently remove an object. Missing objects count as success."""
         ...

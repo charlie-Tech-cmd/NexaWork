@@ -41,3 +41,9 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
     return response
+
+async def private_messaging_middleware(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/v1/messaging/"):
+        response.headers["Cache-Control"] = "private, no-store"
+    return response

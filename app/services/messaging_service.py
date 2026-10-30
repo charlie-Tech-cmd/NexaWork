@@ -3,7 +3,14 @@
 Authorization is enforced here independently of the API routes.
 """
 
-from sqlalchemy import select
+from sqlalchemy import select, or_, and_
+import base64
+import hashlib
+import hmac
+import json
+from datetime import datetime
+from app.core.config import settings
+from app.models.organization import Organization
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -278,6 +285,8 @@ def send_message(
     conversation_id: int,
     sender_id: int,
     body: str,
+    attachment_ids: list[int] | None = None,
+    client_message_id: str | None = None,
 ) -> Message:
     """Send a message only as an active member of the conversation."""
     _require_active_user(db, organization_id, sender_id)
@@ -291,19 +300,47 @@ def send_message(
     if len(body) > 10000:
         raise MessagingValidationError("Message body exceeds 10000 characters")
 
-    message = Message(
-        conversation_id=conversation_id,
-        organization_id=organization_id,
-        sender_id=sender_id,
-        body=body,
-    )
-    db.add(message)
+    from app.services.attachment_service import authorize, claim, AttachmentConflict
+    authorize(db, organization_id, conversation_id, sender_id, lock=True)
+    ids = attachment_ids or []
+    if ids and not settings.attachments_enabled:
+        raise MessagingValidationError("File sharing is currently disabled")
+    fingerprint = hashlib.sha256(json.dumps([body, sorted(ids)], separators=(",", ":")).encode()).hexdigest()
 
+    def existing_request():
+        return db.scalar(select(Message).where(Message.organization_id == organization_id,
+            Message.conversation_id == conversation_id, Message.sender_id == sender_id,
+            Message.client_message_id == client_message_id)) if client_message_id else None
+
+    existing = existing_request()
+    if existing:
+        if existing.request_hash != fingerprint:
+            raise AttachmentConflict("This send identifier was already used for a different message")
+        return existing
+    message = Message(conversation_id=conversation_id, organization_id=organization_id,
+                      sender_id=sender_id, body=body, client_message_id=client_message_id,
+                      request_hash=fingerprint if client_message_id else None)
     try:
+        db.add(message)
+        db.flush()
+        claim(db, organization_id, conversation_id, sender_id, ids, message.id)
         db.commit()
         db.refresh(message)
         return message
-    except IntegrityError:
+    except IntegrityError as exc:
+        db.rollback()
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+        duplicate = constraint == "uq_messages_client_request" or (
+            "UNIQUE constraint failed: messages.organization_id, messages.conversation_id, messages.sender_id, messages.client_message_id" in str(exc.orig))
+        if duplicate and client_message_id:
+            # Reauthorize after rollback; do not reveal a result after revocation.
+            authorize(db, organization_id, conversation_id, sender_id, lock=True)
+            existing = existing_request()
+            if existing and existing.request_hash == fingerprint:
+                return existing
+            raise AttachmentConflict("Conflicting message retry") from exc
+        raise
+    except Exception:
         db.rollback()
         raise
 
@@ -347,3 +384,66 @@ def list_messages(
     # Return oldest-to-newest within this page for normal chat rendering.
     page = list(reversed(page_descending))
     return page, next_cursor
+
+
+def conversation_page(db, organization_id, user_id, limit=50, cursor=None):
+    if not 1 <= limit <= 100:
+        raise MessagingValidationError("Limit must be between 1 and 100")
+    _require_active_user(db, organization_id, user_id)
+    query = select(Conversation).join(ConversationMember,
+        (ConversationMember.conversation_id == Conversation.id) &
+        (ConversationMember.organization_id == Conversation.organization_id)).where(
+        Conversation.organization_id == organization_id, ConversationMember.user_id == user_id,
+        ConversationMember.is_active.is_(True))
+    if cursor:
+        try:
+            data, signature = cursor.split(".")
+            expected = hmac.new(
+                settings.jwt_secret_key.encode(),
+                ("conversation-page:" + data).encode(),
+                hashlib.sha256,
+            ).hexdigest()
+            if not hmac.compare_digest(signature, expected):
+                raise ValueError()
+            payload = json.loads(base64.urlsafe_b64decode(data + "=" * (-len(data) % 4)))
+            if payload["v"] != 1 or payload["org"] != organization_id or payload["user"] != user_id or type(payload["id"]) is not int or payload["id"] <= 0:
+                raise ValueError()
+            stamp, cid = datetime.fromisoformat(payload["time"]), payload["id"]
+            query = query.where(or_(Conversation.created_at < stamp,
+                and_(Conversation.created_at == stamp, Conversation.id < cid)))
+        except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            raise MessagingValidationError("Invalid conversation cursor") from exc
+    rows = list(db.scalars(query.order_by(
+        Conversation.created_at.desc(),
+        Conversation.id.desc(),
+    ).limit(limit + 1)))
+    items = rows[:limit]
+    next_cursor = None
+    if len(rows) > limit:
+        last = items[-1]
+        data = base64.urlsafe_b64encode(json.dumps({"v": 1, "org": organization_id, "user": user_id,
+            "time": last.created_at.isoformat(), "id": last.id}, separators=(
+                ",",
+                ":",
+            )).encode()).decode().rstrip("=")
+        signature = hmac.new(
+            settings.jwt_secret_key.encode(),
+            ("conversation-page:" + data).encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        next_cursor = data + "." + signature
+    return items, next_cursor
+
+
+def conversation_members(db, organization_id, conversation_ids):
+    result = {cid: [] for cid in conversation_ids}
+    if conversation_ids:
+        for cid, uid, name in db.execute(select(ConversationMember.conversation_id, User.id, User.full_name)
+                .join(
+                    User,
+                    (User.id == ConversationMember.user_id) & (User.organization_id == ConversationMember.organization_id),
+                )
+                .where(ConversationMember.organization_id == organization_id, ConversationMember.conversation_id.in_(conversation_ids),
+                       ConversationMember.is_active.is_(True), User.is_active.is_(True)).order_by(User.id)):
+            result[cid].append({"id": uid, "full_name": name})
+    return result
