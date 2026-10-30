@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Wordmark } from "../Wordmark";
 import { Icon } from "../Icon";
-import { dayScenes, navigation, plannedFeatures } from "./content";
+import { dayScenes, navigation, features } from "./content";
 import "./landing.css";
 function StartLink({ className = "" }: { className?: string }) {
   return (
@@ -125,8 +125,9 @@ function Hero() {
           <em>Teams Connect.</em>
         </h1>
         <p className="hero-description">
-          NexaWork brings workplace conversations, team collaboration, company
-          updates, and meetings together in one organized workspace.
+          Bring your people, conversations, and shared documents together.
+          Message a colleague, collaborate in groups, and keep files close to
+          the work they belong to.
         </p>
         <div className="hero-actions">
           <StartLink />
@@ -135,9 +136,9 @@ function Hero() {
           </a>
         </div>
         <p className="hero-availability">
-          Start with your people and organization.
+          Team messaging is here.
           <br />
-          Communication and collaboration features are on the roadmap.
+          Private file sharing is available when enabled for your workspace.
         </p>
         <div className="hero-bottom-note">
           <span className="hero-note-icon">
@@ -214,8 +215,8 @@ function Product() {
               <span /> Available now
             </span>
             <p className="landing-copy">
-              Start with the essentials: your people, your organization, and a
-              clear structure for working together.
+              Set up your organization, bring in your people, and start the
+              conversations that move work forward.
             </p>
           </div>
         </div>
@@ -242,29 +243,40 @@ function Features() {
       className="landing-container landing-section features-section"
     >
       <div className="centered-heading">
-        <p className="landing-eyebrow">MORE THAN A CONVERSATION</p>
-        <h2>A vision for your entire workday.</h2>
+        <p className="landing-eyebrow">MESSAGES AND FILES, TOGETHER</p>
+        <h2>Keep your team and its work connected.</h2>
         <p className="landing-copy">
-          The next chapter of NexaWork brings the everyday pieces of work
-          together.
-          <br className="wide-only" /> These collaboration features are planned
-          and are not available yet.
+          Direct conversations, group discussions, and private file sharing now
+          join your workspace.
+          <br className="wide-only" /> More ways to collaborate are on the
+          roadmap, with availability shown below.
         </p>
       </div>
       <div className="landing-feature-grid">
-        {plannedFeatures.map((feature, index) => (
-          <article className="landing-feature-card" key={feature.title}>
+        {features.map((feature, index) => (
+          <article
+            className={`landing-feature-card ${feature.status !== "Planned" ? "feature-implemented" : ""}`}
+            key={feature.title}
+          >
             <div className="feature-top">
               <span className={`landing-icon feature-tone-${index % 3}`}>
                 <Icon name={feature.icon} />
               </span>
-              <span className="availability-badge">Planned</span>
+              <span
+                className={`availability-badge ${feature.status !== "Planned" ? "available" : ""}`}
+              >
+                {feature.status}
+              </span>
             </div>
             <h3>{feature.title}</h3>
             <p>{feature.description}</p>
           </article>
         ))}
       </div>
+      <p className="feature-enablement-note">
+        To share files, your workspace administrator must first enable file
+        sharing. Messages and shared files stay within their conversation.
+      </p>
     </section>
   );
 }
@@ -275,7 +287,7 @@ function ConceptPreview({ scene }: { scene: (typeof dayScenes)[number] }) {
         <span>
           <span className="concept-dot" /> NexaWork
         </span>
-        <small>Illustrative concept · sample content</small>
+        <small>Illustrative preview · sample content</small>
       </figcaption>
       <div className="concept-title">
         <span className="landing-icon">
@@ -283,9 +295,9 @@ function ConceptPreview({ scene }: { scene: (typeof dayScenes)[number] }) {
         </span>
         <div>
           <small>
-            {scene.status === "Available now"
-              ? "WORKSPACE FOUNDATION"
-              : "PLANNED EXPERIENCE"}
+            {scene.status === "Planned"
+              ? "PLANNED EXPERIENCE"
+              : "WORKSPACE FEATURE"}
           </small>
           <h4>{scene.label}</h4>
         </div>
@@ -361,7 +373,7 @@ function Workday() {
                 <div id={`scene-${index}`} hidden={selected !== index}>
                   <p>{item.description}</p>
                   <span
-                    className={`availability-badge ${item.status === "Available now" ? "available" : ""}`}
+                    className={`availability-badge ${item.status !== "Planned" ? "available" : ""}`}
                   >
                     {item.status}
                   </span>
@@ -379,12 +391,12 @@ function Benefits() {
     {
       icon: "message",
       title: "Fewer walls. More conversation.",
-      text: "A direction built around better communication across teams and departments.",
+      text: "Reach a colleague directly or bring the right people into a group conversation.",
     },
     {
       icon: "file",
       title: "Less searching. More context.",
-      text: "A vision for organized information and a central place for workplace conversations.",
+      text: "Find shared documents alongside the messages that explain them, in each conversation’s Files tab.",
     },
     {
       icon: "people",
@@ -405,10 +417,10 @@ function Benefits() {
           With the whole organization in mind.
         </h2>
         <p className="landing-copy">
-          NexaWork is being built to make workplace communication and
-          collaboration
-          <br className="wide-only" /> feel more connected, more organized, and
-          more human.
+          Give your people a shared place to talk, exchange documents, and work
+          together.
+          <br className="wide-only" /> Built around your organization and the
+          teams within it.
         </p>
       </div>
       <div className="benefits-grid">
@@ -442,7 +454,7 @@ function Closing() {
           <p>Create a more connected workplace with NexaWork.</p>
           <StartLink className="landing-button-light" />
           <small>
-            Start with organization setup. Collaboration features are planned.
+            Set up your workspace, add colleagues, and start a conversation.
           </small>
         </div>
         <span className="closing-symbol" aria-hidden="true">
@@ -465,7 +477,7 @@ function Footer() {
           <nav aria-label="Footer product links">
             <h3>Explore NexaWork</h3>
             <a href="#product">Product</a>
-            <a href="#features">Feature roadmap</a>
+            <a href="#features">Features & roadmap</a>
             <a href="#about">About</a>
           </nav>
           <nav aria-label="Workspace links">

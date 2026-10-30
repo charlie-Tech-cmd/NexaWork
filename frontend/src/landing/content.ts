@@ -1,34 +1,42 @@
-// Verified against main a39b177. Keep marketing availability tied to released routes.
-export const plannedFeatures = [
+// Messaging and private files are implemented in PR #8; uploads require workspace enablement.
+export const features = [
   {
     icon: "message",
     title: "Team Messaging",
-    description: "Organized conversations for employees and teams.",
+    description:
+      "Start a direct or group conversation, share updates, and return to earlier messages whenever you need the context.",
+    status: "Available now",
+  },
+  {
+    icon: "file",
+    title: "Private File Sharing",
+    description:
+      "Share documents with a message and find them in the conversation’s Files tab. Downloads are limited to conversation members.",
+    status: "Available when enabled",
   },
   {
     icon: "channels",
     title: "Channels and Collaboration",
     description: "Keep project and department discussions organized.",
+    status: "Planned",
   },
   {
     icon: "announcement",
     title: "Company Announcements",
     description: "Share important updates across the organization.",
+    status: "Planned",
   },
   {
     icon: "video",
     title: "Meetings",
     description: "Bring colleagues together for virtual collaboration.",
-  },
-  {
-    icon: "file",
-    title: "File Sharing",
-    description: "Make work-related documents easier to access and share.",
+    status: "Planned",
   },
   {
     icon: "spark",
     title: "AI Workplace Assistant",
     description: "Help employees find information and work more efficiently.",
+    status: "Planned",
   },
 ] as const;
 export const navigation = [
@@ -50,8 +58,8 @@ export const dayScenes = [
   {
     title: "Keep the conversation moving.",
     description:
-      "The vision: a colleague asks a question, the team shares context, and project conversations stay easy to follow.",
-    status: "Planned",
+      "Message a colleague directly or bring the team into a group conversation. Keep separate drafts and pick up earlier discussions without losing the context.",
+    status: "Available now",
     icon: "message",
     label: "Team conversation",
     rows: [
@@ -61,13 +69,17 @@ export const dayScenes = [
     ],
   },
   {
-    title: "Make space to work together.",
+    title: "Keep files with the conversation.",
     description:
-      "The vision: move from a discussion to a meeting, share the relevant documents, and find the information you need.",
-    status: "Planned",
-    icon: "video",
-    label: "A collaborative afternoon",
-    rows: ["Project discussion", "Team catch-up", "Shared documents"],
+      "Attach a document, add a message, and share it with the people in your conversation. Open the Files tab to find and download shared documents once file sharing is enabled for your workspace.",
+    status: "Available when enabled",
+    icon: "file",
+    label: "Conversation files",
+    rows: [
+      "Project discussion",
+      "Review notes.pdf",
+      "Download shared documents",
+    ],
   },
   {
     title: "Keep everyone in the loop.",
