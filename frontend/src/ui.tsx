@@ -24,6 +24,16 @@ export function DataForm({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [visiblePasswords, setVisiblePasswords] = useState<
+    Record<string, boolean>
+  >({});
+
+  function togglePasswordVisibility(name: string) {
+    setVisiblePasswords((current) => ({
+      ...current,
+      [name]: !current[name],
+    }));
+  }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -65,6 +75,39 @@ export function DataForm({
                   </option>
                 ))}
               </select>
+            ) : field.type === "password" ? (
+              <span className="password-input-wrap">
+                <input
+                  name={field.name}
+                  type={visiblePasswords[field.name] ? "text" : "password"}
+                  defaultValue={field.value || ""}
+                  required={!field.optional}
+                  minLength={field.minLength}
+                  maxLength={field.maxLength || 255}
+                  autoComplete={
+                    field.name.includes("confirm") || field.minLength
+                      ? "new-password"
+                      : "current-password"
+                  }
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  aria-label={
+                    visiblePasswords[field.name]
+                      ? `Hide ${field.label.toLowerCase()}`
+                      : `Show ${field.label.toLowerCase()}`
+                  }
+                  aria-pressed={Boolean(visiblePasswords[field.name])}
+                  onClick={() => togglePasswordVisibility(field.name)}
+                >
+                  <Icon
+                    name={
+                      visiblePasswords[field.name] ? "eye-off" : "eye"
+                    }
+                  />
+                </button>
+              </span>
             ) : (
               <input
                 name={field.name}
@@ -74,13 +117,7 @@ export function DataForm({
                 minLength={field.minLength}
                 maxLength={field.maxLength || 255}
                 autoComplete={
-                  field.type === "password"
-                    ? field.name.includes("confirm") || field.minLength
-                      ? "new-password"
-                      : "current-password"
-                    : field.type === "email"
-                      ? "email"
-                      : "off"
+                  field.type === "email" ? "email" : "off"
                 }
               />
             )}
