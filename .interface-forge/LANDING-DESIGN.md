@@ -23,7 +23,9 @@ Dribbble reference research:
 
 ## Truthful feature inventory
 
-Available in this branch via existing backend: organization onboarding, people create/list/edit, region/branch/department/team create/list, role create/list/permission inspection, organization settings. Messaging exists only in separate unmerged work and is not offered here. Channels, announcements, meetings, file sharing and AI are roadmap features. All six cards are marked Planned. No deployment is claimed.
+Updated after PR #8 merged at `16fe31e` (2026-10-30): organization onboarding, people create/list/edit, region/branch/department/team create/list, role create/list/permission inspection and organization settings remain implemented. Direct/group messaging now has an available badge. Private file sharing has an explicit “Available when enabled” badge and workspace-administrator enablement note; uploads remain off by default. Channels, announcements, meetings and AI remain Planned. No production activation or deployment is claimed.
+
+The hero, feature cards, workday scenes, benefits, closing copy and HTML description reflect this inventory. Messaging/files cards appear first and receive a restrained blue highlight using existing tokens. Workday illustrations remain labeled sample content. No presence, read receipts, public sharing, invitation delivery or realtime transport claims are added.
 
 Contact: no verified public business contact. The section directs existing users to their organization administrator and states that a public channel is unavailable. Privacy/Terms pages do not exist, so there are no fabricated legal links.
 

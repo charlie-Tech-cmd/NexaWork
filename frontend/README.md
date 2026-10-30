@@ -66,9 +66,11 @@ routes while forwarding `/api/*` to FastAPI.
 Office photos are self-hosted in `public/images` with responsive sources, lazy
 loading below the fold, alt text and an image-error fallback. Attribution and
 license sources are recorded in `../.interface-forge/LANDING-DESIGN.md`.
-The landing page marks all unreleased collaboration features as planned and all
-illustrative interface previews as concepts. It makes no customer, metric, legal
-page or public-contact claims.
+The landing page highlights implemented direct/group messaging and private file
+sharing, with file availability explicitly conditional on workspace enablement.
+Channels, announcements, meetings and AI remain marked Planned. Illustrative
+interface previews are labeled as sample content, not live screenshots. It makes
+no customer, metric, legal page or public-contact claims.
 
 ## Brand system
 

@@ -497,8 +497,22 @@
   border-color: #c5d3eb;
   box-shadow: 0 8px 25px #14243d07;
 }
+.landing-feature-card.feature-implemented {
+  border-color: var(--selected-border);
+  background: linear-gradient(160deg, var(--selected), var(--surface) 65%);
+}
+.feature-enablement-note {
+  margin: 24px auto 0;
+  max-width: 680px;
+  color: var(--lp-muted);
+  font-size: 12px;
+  line-height: 1.8;
+  text-align: center;
+}
 .feature-top {
   display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 26px;
