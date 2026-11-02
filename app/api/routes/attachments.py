@@ -14,7 +14,11 @@ from app.db.session import get_db
 from app.core.config import settings
 from app.models.user import User
 from app.models.organization import Organization
-from app.schemas.attachment import AttachmentResponse, AttachmentPage
+from app.schemas.attachment import (
+    AttachmentPage,
+    AttachmentResponse,
+    FilePolicyResponse,
+)
 from app.services import attachment_service as service
 from app.services.file_validation import FileRejected, validate_content, scan_file
 from app.services.messaging_service import ConversationAccessError, MessagingValidationError
@@ -43,6 +47,26 @@ def available():
         raise HTTPException(503, "File sharing is not configured for this workspace")
 
 
+def uploads_available():
+    available()
+    if not uploads_ready():
+        raise HTTPException(
+            503,
+            "File uploads are not configured or private storage is unavailable.",
+        )
+
+
+def uploads_ready() -> bool:
+    if not settings.attachment_uploads_enabled:
+        return False
+    try:
+        service.storage()
+    except OSError:
+        logger.exception("attachment_storage_not_ready")
+        return False
+    return True
+
+
 def translate(exc):
     if isinstance(exc, ConversationAccessError):
         return HTTPException(404, "Conversation or file not found")
@@ -59,9 +83,11 @@ def translate(exc):
     return HTTPException(503, "File storage or safety scanning is temporarily unavailable")
 
 
-@router.get("/file-policy")
+@router.get("/file-policy", response_model=FilePolicyResponse)
 def policy(user: User = Depends(get_current_user)):
-    return {"enabled": settings.attachments_enabled, "max_bytes": settings.attachment_max_bytes,
+    return {"enabled": settings.attachments_enabled,
+            "uploads_enabled": uploads_ready(),
+            "max_bytes": settings.attachment_max_bytes,
             "max_attachments": settings.attachment_max_per_message, "extensions": [
                 ".txt",
                 ".pdf",
@@ -82,7 +108,7 @@ def policy(user: User = Depends(get_current_user)):
 async def upload(cid: Annotated[int, Path(gt=0)], request: Request, x_filename: str = Header(max_length=3000),
                  user: User = Depends(get_current_user), org: Organization = Depends(get_current_organization),
                  db: Session = Depends(get_db)):
-    available()
+    uploads_available()
     org_id, uid = org.id, user.id
     if cid <= 0:
         raise HTTPException(422, "Invalid conversation ID")
@@ -126,7 +152,7 @@ async def upload(cid: Annotated[int, Path(gt=0)], request: Request, x_filename: 
                     try:
                         scan_file(
                             stream,
-                            settings.file_scan_host,
+                            settings.file_scan_host.strip(),
                             settings.file_scan_port,
                             settings.file_scan_timeout,
                         )
@@ -202,6 +228,7 @@ def list_files(cid: Annotated[
     le=100,
 ),
                user: User = Depends(get_current_user), org: Organization = Depends(get_current_organization), db: Session = Depends(get_db)):
+    available()
     try:
         items, cursor = service.page(db, org.id, cid, user.id, before_id, limit)
         return AttachmentPage(items=items, next_cursor=cursor)
@@ -217,6 +244,7 @@ def metadata(
     org: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    available()
     try:
         return service.get_attachment(db, org.id, cid, user.id, aid)
     except ValueError as exc:
@@ -231,6 +259,7 @@ def download(
     org: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    available()
     if settings.messaging_rate_limits_enabled:
         try:
             allowed = check_rate_limit(f"messaging:download:{org.id}:{user.id}", 120, 60)
@@ -277,6 +306,7 @@ def remove(
     org: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    available()
     try:
         return service.request_delete(db, org.id, cid, user.id, aid)
     except (ValueError, PermissionError) as exc:

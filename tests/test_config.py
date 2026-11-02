@@ -26,6 +26,20 @@ def test_valid_production_settings_are_accepted():
     assert settings.cors_origin_list == ["https://app.example.com"]
 
 
+def test_production_attachment_storage_root_must_be_absolute():
+    required = {
+        "attachments_enabled": True,
+        "persistent_local_storage": True,
+        "storage_local_root": "/srv/nexawork/private-files",
+        "file_scan_host": "scanner.internal",
+        "messaging_rate_limits_enabled": True,
+    }
+    assert make_production_settings(**required).attachments_enabled
+
+    with pytest.raises(ValidationError, match="absolute path"):
+        make_production_settings(**{**required, "storage_local_root": "./private-files"})
+
+
 @pytest.mark.parametrize(
     ("override", "message"),
     [

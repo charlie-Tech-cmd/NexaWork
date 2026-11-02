@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, errorMessage, type Session } from "./api";
 import { PageHeading, ErrorState, Empty } from "./ui";
 import { Icon } from "./Icon";
-import { useResource } from "./useResource";
 import {
   ConversationComposer,
   type ComposerDrafts,
+  type ReplyTarget,
 } from "./ConversationComposer";
 import { ConversationCreate } from "./ConversationCreate";
 import {
@@ -16,6 +16,7 @@ import {
   type Conversation,
   type FilePolicy,
   type Message,
+  type MemberReadState,
   type MessagingApi,
 } from "./messaging-api";
 import "./messaging.css";
@@ -217,6 +218,7 @@ function ConversationThread({
   conversation,
   session,
   policy,
+  policyError,
   view,
   setView,
   back,
@@ -226,6 +228,7 @@ function ConversationThread({
   conversation: Conversation;
   session: Session;
   policy: FilePolicy | null;
+  policyError: string;
   view: string;
   setView: (v: string) => void;
   back: () => void;
@@ -233,6 +236,11 @@ function ConversationThread({
 }) {
   const [messages, setMessages] = useState<Message[]>([]),
     [cursor, setCursor] = useState<number | null>(null);
+  const [readMembers, setReadMembers] = useState<MemberReadState[]>([]);
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<
+    number | null
+  >(null);
   const [loading, setLoading] = useState(true),
     [olderBusy, setOlderBusy] = useState(false),
     [error, setError] = useState(""),
@@ -240,6 +248,8 @@ function ConversationThread({
   const [revision, setRevision] = useState(0),
     [refreshing, setRefreshing] = useState(false);
   const older = useRef<AbortController | null>(null);
+  const pendingJumpId = useRef<number | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const history = useRef<HTMLDivElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const newestId = useRef<number | null>(null);
@@ -260,6 +270,13 @@ function ConversationThread({
       try {
         if (!document.hidden && navigator.onLine) {
           setRefreshing(true);
+          const wasAtBottom =
+            !firstPageLoaded.current ||
+            !history.current ||
+            history.current.scrollHeight -
+              history.current.scrollTop -
+              history.current.clientHeight <
+              80;
           let next = newestId.current;
           let batches = 0;
           do {
@@ -267,13 +284,6 @@ function ConversationThread({
               ? await api.updates(cid, next, controller.signal)
               : await api.messages(cid, null, controller.signal);
             if (controller.signal.aborted) return;
-            const atBottom =
-              !firstPageLoaded.current ||
-              !history.current ||
-              history.current.scrollHeight -
-                history.current.scrollTop -
-                history.current.clientHeight <
-                80;
             setMessages((old) => mergeMessages(old, page.items));
             if (!firstPageLoaded.current || newestId.current === null) {
               setCursor(page.next_cursor);
@@ -281,12 +291,17 @@ function ConversationThread({
             }
             if (page.items.length) newestId.current = page.items.at(-1)!.id;
             next = next ? page.next_cursor : null;
-            if (atBottom && page.items.length)
+            if (wasAtBottom && page.items.length)
               requestAnimationFrame(() =>
                 bottom.current?.scrollIntoView({ block: "nearest" }),
               );
             batches++;
           } while (next && batches < 5);
+          if (wasAtBottom && newestId.current !== null)
+            await api.markRead(cid, newestId.current, controller.signal);
+          const readState = await api.readState(cid, controller.signal);
+          if (controller.signal.aborted) return;
+          setReadMembers(readState.members);
           setError("");
           setDenied(false);
         }
@@ -295,6 +310,7 @@ function ConversationThread({
           setError(errorMessage(cause));
           if (cause instanceof ApiError && [403, 404].includes(cause.status)) {
             setMessages([]);
+            setReadMembers([]);
             newestId.current = null;
             firstPageLoaded.current = false;
             setDenied(true);
@@ -314,13 +330,69 @@ function ConversationThread({
       if (timer) clearTimeout(timer);
     };
   }, [api, cid, revision, view]);
-  useEffect(() => () => older.current?.abort(), []);
+  useEffect(
+    () => () => {
+      older.current?.abort();
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    },
+    [],
+  );
+  useEffect(() => {
+    const messageId = pendingJumpId.current;
+    if (messageId === null) return;
+    const target = document.getElementById(`message-${cid}-${messageId}`);
+    if (!target) return;
+    pendingJumpId.current = null;
+    setHighlightedMessageId(messageId);
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+      block: "center",
+    });
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(
+      () => setHighlightedMessageId(null),
+      2400,
+    );
+  }, [cid, messages]);
+  function focusMessage(messageId: number) {
+    const target = document.getElementById(`message-${cid}-${messageId}`);
+    if (target) {
+      setHighlightedMessageId(messageId);
+      target.focus({ preventScroll: true });
+      target.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "center",
+      });
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+      highlightTimer.current = setTimeout(
+        () => setHighlightedMessageId(null),
+        2400,
+      );
+      return;
+    }
+
+    pendingJumpId.current = messageId;
+    void api
+      .message(cid, messageId)
+      .then((message) => setMessages((old) => mergeMessages(old, [message])))
+      .catch((cause) => {
+        pendingJumpId.current = null;
+        setError(errorMessage(cause));
+      });
+  }
   function refreshHistory() {
     older.current?.abort();
     older.current = null;
     newestId.current = null;
     firstPageLoaded.current = false;
     setMessages([]);
+    setReadMembers([]);
+    setReplyTo(null);
     setCursor(null);
     setLoading(true);
     setRevision((revision) => revision + 1);
@@ -350,6 +422,9 @@ function ConversationThread({
       older.current = null;
     }
   }
+  const otherMemberCount = conversation.members.filter(
+    (member) => member.id !== session.id,
+  ).length;
   return (
     <section
       className="conversation-thread"
@@ -376,25 +451,27 @@ function ConversationThread({
           Refresh
         </button>
       </header>
-      <div
-        className="conversation-tabs"
-        role="group"
-        aria-label="Conversation view"
-      >
-        <button
-          aria-pressed={view === "messages"}
-          onClick={() => setView("messages")}
+      {policy?.enabled && (
+        <div
+          className="conversation-tabs"
+          role="group"
+          aria-label="Conversation view"
         >
-          Messages
-        </button>
-        <button
-          aria-pressed={view === "files"}
-          onClick={() => setView("files")}
-        >
-          Files
-        </button>
-      </div>
-      {view === "files" ? (
+          <button
+            aria-pressed={view === "messages"}
+            onClick={() => setView("messages")}
+          >
+            Messages
+          </button>
+          <button
+            aria-pressed={view === "files"}
+            onClick={() => setView("files")}
+          >
+            Files
+          </button>
+        </div>
+      )}
+      {view === "files" && policy?.enabled ? (
         <ConversationFiles key={cid} api={api} cid={cid} userId={session.id} />
       ) : (
         <>
@@ -430,7 +507,15 @@ function ConversationThread({
                     message.sender_id === session.id ? "message-own" : ""
                   }
                 >
-                  <article>
+                  <article
+                    id={`message-${cid}-${message.id}`}
+                    tabIndex={-1}
+                    className={
+                      highlightedMessageId === message.id
+                        ? "message-highlight"
+                        : undefined
+                    }
+                  >
                     <header>
                       <strong>
                         {message.sender_id === session.id
@@ -450,6 +535,20 @@ function ConversationThread({
                         )}
                       </time>
                     </header>
+                    {message.reply_to && (
+                      <button
+                        type="button"
+                        className="message-reply-preview"
+                        onClick={() => focusMessage(message.reply_to!.id)}
+                        aria-label={`Jump to message from ${memberNames.get(message.reply_to.sender_id) || "a conversation member"}`}
+                      >
+                        <strong>
+                          {memberNames.get(message.reply_to.sender_id) ||
+                            `Member #${message.reply_to.sender_id}`}
+                        </strong>
+                        <span>{message.reply_to.body}</span>
+                      </button>
+                    )}
                     <p className="message-body">{message.body}</p>
                     {message.attachments?.map((file) => (
                       <SharedFile
@@ -470,6 +569,63 @@ function ConversationThread({
                         }
                       />
                     ))}
+                    <footer className="message-actions">
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={() =>
+                          setReplyTo({
+                            id: message.id,
+                            senderName:
+                              message.sender_id === session.id
+                                ? "You"
+                                : memberNames.get(message.sender_id) ||
+                                  `Member #${message.sender_id}`,
+                            body: message.body,
+                          })
+                        }
+                        aria-label={`Reply to message from ${message.sender_id === session.id ? "you" : memberNames.get(message.sender_id) || "a conversation member"}`}
+                      >
+                        Reply
+                      </button>
+                      {message.sender_id === session.id &&
+                        otherMemberCount > 0 &&
+                        (() => {
+                          const seenBy = readMembers.filter((member) => {
+                            if (
+                              member.user_id === session.id ||
+                              !member.last_read_at
+                            )
+                              return false;
+                            return (
+                              Date.parse(member.last_read_at) >=
+                              Date.parse(message.created_at)
+                            );
+                          });
+                          return (
+                            <span
+                              className="message-seen"
+                              aria-label={
+                                seenBy.length
+                                  ? `Seen by ${seenBy
+                                      .map(
+                                        (member) =>
+                                          memberNames.get(member.user_id) ||
+                                          "a conversation member",
+                                      )
+                                      .join(", ")}`
+                                  : "Not seen yet"
+                              }
+                            >
+                              {seenBy.length
+                                ? conversation.conversation_type === "direct"
+                                  ? `Seen by ${memberNames.get(seenBy[0].user_id) || "member"}`
+                                  : `Seen by ${seenBy.length} of ${otherMemberCount}`
+                                : "Sent"}
+                            </span>
+                          );
+                        })()}
+                    </footer>
                   </article>
                 </li>
               ))}
@@ -482,7 +638,10 @@ function ConversationThread({
               api={api}
               cid={cid}
               policy={policy}
+              policyError={policyError}
               drafts={drafts}
+              replyTo={replyTo}
+              onCancelReply={() => setReplyTo(null)}
               onSent={(message) => {
                 setMessages((old) => mergeMessages(old, [message]));
                 requestAnimationFrame(() =>
@@ -503,10 +662,16 @@ export function Messaging({
   session,
   signOut,
   initialView,
+  policy,
 }: {
   session: Session;
   signOut: (message?: string) => void;
   initialView: "messages" | "files";
+  policy: {
+    data: FilePolicy | null;
+    error: string;
+    reload: () => void;
+  };
 }) {
   const api = useMemo(
     () =>
@@ -524,7 +689,6 @@ export function Messaging({
     [error, setError] = useState("");
   const active = useRef<AbortController | null>(null);
   const drafts: ComposerDrafts = useRef(new Map());
-  const policy = useResource((signal) => api.policy(signal), [session.id]);
   const load = useCallback(
     async (next: string | null) => {
       if (active.current) return;
@@ -689,6 +853,7 @@ export function Messaging({
             }
             session={session}
             policy={policy.data}
+            policyError={policy.error}
             drafts={drafts}
             view={view}
             setView={setView}

@@ -35,6 +35,7 @@ class GroupConversationCreate(BaseModel):
 class MessageCreate(BaseModel):
     attachment_ids: list[int] = Field(default_factory=list, max_length=10)
     client_message_id: UUID | None = None
+    reply_to_message_id: int | None = Field(default=None, gt=0)
 
     @field_validator("attachment_ids")
     @classmethod
@@ -74,6 +75,12 @@ class ConversationResponse(BaseModel):
     created_at: datetime
 
 
+class MessageReplyPreview(BaseModel):
+    id: int
+    sender_id: int
+    body: str
+
+
 class MessageResponse(BaseModel):
     attachments: list[AttachmentResponse] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True)
@@ -84,6 +91,22 @@ class MessageResponse(BaseModel):
     body: str
     created_at: datetime
     edited_at: datetime | None
+    reply_to: MessageReplyPreview | None = None
+
+
+class ConversationReadRequest(BaseModel):
+    last_message_id: int = Field(gt=0)
+
+
+class ConversationReadMember(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: int
+    last_read_at: datetime | None
+
+
+class ConversationReadState(BaseModel):
+    members: list[ConversationReadMember]
 
 
 class MessagePage(BaseModel):

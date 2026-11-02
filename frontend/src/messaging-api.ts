@@ -17,20 +17,49 @@ export type Attachment = {
   status: "uploading" | "ready" | "attached" | "deleting" | "deleted";
   created_at: string;
 };
+export type MessageReply = {
+  id: number;
+  sender_id: number;
+  body: string;
+};
 export type Message = {
   id: number;
   sender_id: number;
   body: string;
   created_at: string;
   attachments: Attachment[];
+  reply_to?: MessageReply | null;
+};
+export type MemberReadState = {
+  user_id: number;
+  last_read_at: string | null;
 };
 export type Page<T, C = number> = { items: T[]; next_cursor: C | null };
 export type FilePolicy = {
   enabled: boolean;
+  uploads_enabled: boolean;
   max_bytes: number;
   max_attachments: number;
   extensions: string[];
 };
+
+function isFilePolicy(value: unknown): value is FilePolicy {
+  if (!value || typeof value !== "object") return false;
+  const policy = value as Record<string, unknown>;
+  return (
+    typeof policy.enabled === "boolean" &&
+    typeof policy.uploads_enabled === "boolean" &&
+    (!policy.uploads_enabled || policy.enabled) &&
+    typeof policy.max_bytes === "number" &&
+    Number.isInteger(policy.max_bytes) &&
+    policy.max_bytes > 0 &&
+    typeof policy.max_attachments === "number" &&
+    Number.isInteger(policy.max_attachments) &&
+    policy.max_attachments > 0 &&
+    Array.isArray(policy.extensions) &&
+    policy.extensions.every((extension) => typeof extension === "string")
+  );
+}
 export function mergeMessages(
   current: Message[],
   incoming: Message[],
@@ -52,6 +81,8 @@ export function titleFor(c: Conversation, userId: number): string {
 export function checkFiles(files: File[], policy: FilePolicy): void {
   if (!policy.enabled)
     throw new Error("File sharing is not configured for this workspace.");
+  if (!policy.uploads_enabled)
+    throw new Error("File uploads are not configured for this workspace.");
   if (files.length > policy.max_attachments)
     throw new Error(`Choose up to ${policy.max_attachments} files.`);
   for (const file of files) {
@@ -148,9 +179,30 @@ export function createMessagingApi(token: string, expired: () => void) {
         undefined,
         signal,
       ),
+    message: (cid: number, messageId: number, signal?: AbortSignal) =>
+      json<Message>(
+        `/conversations/${cid}/messages/${messageId}`,
+        "GET",
+        undefined,
+        signal,
+      ),
     updates: (cid: number, after: number, signal?: AbortSignal) =>
       json<Page<Message>>(
         `/conversations/${cid}/updates?limit=50&after_id=${after}`,
+        "GET",
+        undefined,
+        signal,
+      ),
+    markRead: (cid: number, lastMessageId: number, signal?: AbortSignal) =>
+      json<MemberReadState>(
+        `/conversations/${cid}/read`,
+        "POST",
+        { last_message_id: lastMessageId },
+        signal,
+      ),
+    readState: (cid: number, signal?: AbortSignal) =>
+      json<{ members: MemberReadState[] }>(
+        `/conversations/${cid}/read-state`,
         "GET",
         undefined,
         signal,
@@ -161,15 +213,32 @@ export function createMessagingApi(token: string, expired: () => void) {
       attachment_ids: number[],
       client_message_id: string,
       signal?: AbortSignal,
+      reply_to_message_id?: number | null,
     ) =>
       json<Message>(
         `/conversations/${cid}/messages`,
         "POST",
-        { body, attachment_ids, client_message_id },
+        {
+          body,
+          attachment_ids,
+          client_message_id,
+          ...(reply_to_message_id ? { reply_to_message_id } : {}),
+        },
         signal,
       ),
-    policy: (signal?: AbortSignal) =>
-      json<FilePolicy>("/file-policy", "GET", undefined, signal),
+    policy: async (signal?: AbortSignal) => {
+      const value = await json<unknown>(
+        "/file-policy",
+        "GET",
+        undefined,
+        signal,
+      );
+      if (!isFilePolicy(value))
+        throw new ApiError(
+          "File-sharing settings returned an unexpected response.",
+        );
+      return value;
+    },
     files: (cid: number, before: number | null, signal?: AbortSignal) =>
       json<Page<Attachment>>(
         `/conversations/${cid}/attachments?limit=30${before ? `&before_id=${before}` : ""}`,

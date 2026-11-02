@@ -1,6 +1,7 @@
 """Private local adapter with atomic publication of completed objects."""
 import os
 import re
+import stat
 import tempfile
 from pathlib import Path
 from typing import BinaryIO
@@ -68,6 +69,10 @@ class LocalStorage:
     def __init__(self, root: str):
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if stat.S_IMODE(self.root.stat().st_mode) & 0o077:
+            raise PermissionError("Private storage directory must not be accessible by group or others")
+        if not os.access(self.root, os.R_OK | os.W_OK | os.X_OK):
+            raise PermissionError("Private storage directory is not accessible to the application")
 
     def path(self, key: str) -> Path:
         if not re.fullmatch(r"[a-f0-9]{32}", key):
@@ -78,7 +83,7 @@ class LocalStorage:
         destination = self.path(key)
 
         fd, staging_path = tempfile.mkstemp(
-            prefix=".staging-",
+            prefix=f".staging-{key}-",
             dir=self.root,
         )
         stream = None
@@ -98,3 +103,5 @@ class LocalStorage:
 
     def delete(self, key: str) -> None:
         self.path(key).unlink(missing_ok=True)
+        for staging_path in self.root.glob(f".staging-{key}-*"):
+            staging_path.unlink(missing_ok=True)

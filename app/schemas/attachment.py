@@ -4,6 +4,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 
+class FilePolicyResponse(BaseModel):
+    enabled: bool
+    uploads_enabled: bool
+    max_bytes: int
+    max_attachments: int
+    extensions: list[str]
+
+
 class AttachmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

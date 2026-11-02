@@ -37,6 +37,11 @@ class Message(Base):
             ["users.id", "users.organization_id"],
             name="fk_messages_sender_organization",
         ),
+        ForeignKeyConstraint(
+            ["reply_to_message_id", "conversation_id", "organization_id"],
+            ["messages.id", "messages.conversation_id", "messages.organization_id"],
+            name="fk_messages_reply_scope",
+        ),
         CheckConstraint(
             "length(trim(body)) > 0",
             name="ck_messages_body_not_empty",
@@ -68,6 +73,8 @@ class Message(Base):
         Text,
         nullable=False,
     )
+
+    reply_to_message_id: Mapped[int | None] = mapped_column(nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

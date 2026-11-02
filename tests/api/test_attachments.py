@@ -35,6 +35,54 @@ def upload(client, headers, cid, data=b"hello", filename="notes.txt"):
     )
 
 
+def test_file_policy_matches_feature_and_upload_readiness(
+    client, file_workspace, monkeypatch, tmp_path
+):
+    a, _, _, conversation = file_workspace
+    auth = login(client, a.email)
+    path = "/api/v1/messaging/file-policy"
+
+    ready = client.get(path, headers=auth)
+    assert ready.status_code == 200
+    assert ready.json()["enabled"] is True
+    assert ready.json()["uploads_enabled"] is True
+
+    monkeypatch.setattr(settings, "allow_unscanned_development_files", False)
+    not_scannable = client.get(path, headers=auth)
+    assert not_scannable.json()["enabled"] is True
+    assert not_scannable.json()["uploads_enabled"] is False
+    assert (
+        client.get(
+            f"/api/v1/messaging/conversations/{conversation.id}/attachments",
+            headers=auth,
+        ).status_code
+        == 200
+    )
+    assert upload(client, auth, conversation.id).status_code == 503
+
+    monkeypatch.setattr(settings, "allow_unscanned_development_files", True)
+    unsafe_root = tmp_path / "unsafe-files"
+    unsafe_root.mkdir()
+    unsafe_root.chmod(0o755)
+    monkeypatch.setattr(settings, "storage_local_root", str(unsafe_root))
+    storage_not_ready = client.get(path, headers=auth)
+    assert storage_not_ready.json()["enabled"] is True
+    assert storage_not_ready.json()["uploads_enabled"] is False
+    assert upload(client, auth, conversation.id).status_code == 503
+
+    monkeypatch.setattr(settings, "attachments_enabled", False)
+    disabled = client.get(path, headers=auth)
+    assert disabled.json()["enabled"] is False
+    assert disabled.json()["uploads_enabled"] is False
+    root = f"/api/v1/messaging/conversations/{conversation.id}/attachments"
+    assert client.get(root, headers=auth).status_code == 503
+    assert client.get(f"{root}/1", headers=auth).status_code == 503
+    assert client.get(f"{root}/1/download", headers=auth).status_code == 503
+    assert client.delete(f"{root}/1", headers=auth).status_code == 503
+    assert upload(client, auth, conversation.id).status_code == 503
+    assert client.get(path).status_code == 401
+
+
 def test_upload_share_download_delete_and_idempotent_send(client, db_session, file_workspace):
     a, b, _, c = file_workspace
     auth, other = login(client, a.email), login(client, b.email)
@@ -57,6 +105,38 @@ def test_upload_share_download_delete_and_idempotent_send(client, db_session, fi
     assert client.delete(f"{root}/attachments/{aid}", headers=other).status_code == 403
     assert client.delete(f"{root}/attachments/{aid}", headers=auth).status_code == 202
     assert client.get(f"{root}/attachments/{aid}/download", headers=other).status_code == 410
+
+
+def test_disabling_files_hides_message_file_metadata_and_blocks_attachment_claims(
+    client, db_session, file_workspace, monkeypatch
+):
+    a, _, _, conversation = file_workspace
+    auth = login(client, a.email)
+    root = f"/api/v1/messaging/conversations/{conversation.id}"
+    attachment = upload(client, auth, conversation.id).json()
+    sent = client.post(
+        f"{root}/messages",
+        headers=auth,
+        json={"body": "Attached notes", "attachment_ids": [attachment["id"]]},
+    )
+    assert sent.status_code == 201
+    assert len(sent.json()["attachments"]) == 1
+
+    monkeypatch.setattr(settings, "attachments_enabled", False)
+    history = client.get(f"{root}/messages", headers=auth)
+    assert history.status_code == 200
+    assert history.json()["items"][0]["attachments"] == []
+
+    blocked = client.post(
+        f"{root}/messages",
+        headers=auth,
+        json={"body": "Try to attach again", "attachment_ids": [attachment["id"]]},
+    )
+    assert blocked.status_code == 503
+    assert (
+        db_session.scalar(select(Message).where(Message.body == "Try to attach again"))
+        is None
+    )
 
 
 def test_membership_denials_and_validation(client, file_workspace, monkeypatch):

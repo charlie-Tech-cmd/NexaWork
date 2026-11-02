@@ -71,7 +71,7 @@ export const dayScenes = [
   {
     title: "Keep files with the conversation.",
     description:
-      "Attach a document, add a message, and share it with the people in your conversation. Open the Files tab to find and download shared documents once file sharing is enabled for your workspace.",
+      "Attach a document, add a message, and share it with the people in your conversation. Open the Files tab to find and download shared documents when file sharing is enabled and configured for your workspace.",
     status: "Available when enabled",
     icon: "file",
     label: "Conversation files",

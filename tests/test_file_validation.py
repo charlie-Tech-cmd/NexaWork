@@ -42,6 +42,23 @@ class FileSecurityTests(unittest.TestCase):
             with self.assertRaises(ValueError): store.open("../outside")
             store.delete(key); store.delete(key)
 
+    def test_storage_rejects_group_or_world_accessible_roots(self):
+        with tempfile.TemporaryDirectory() as root:
+            Path(root).chmod(0o755)
+            with self.assertRaises(PermissionError):
+                LocalStorage(root)
+
+    def test_delete_removes_abandoned_staging_objects_for_the_key(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = LocalStorage(root)
+            key = "1" * 32
+            orphan = Path(root, f".staging-{key}-orphan")
+            orphan.write_bytes(b"partial upload")
+
+            store.delete(key)
+
+            self.assertFalse(orphan.exists())
+
     def test_staging_writer_publishes_only_after_complete(self):
         with tempfile.TemporaryDirectory() as root:
             store = LocalStorage(root)

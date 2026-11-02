@@ -96,6 +96,11 @@ export async function request(
     });
   } catch (error) {
     if (signal?.aborted) throw error;
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new ApiError(
+        "Your workspace request timed out. Check that the local API and its database are reachable, then try again.",
+      );
+    }
     throw new ApiError(
       "Could not reach your workspace. Check your connection and try again.",
     );

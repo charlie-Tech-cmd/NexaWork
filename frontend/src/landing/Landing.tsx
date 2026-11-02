@@ -380,8 +380,8 @@ function Product() {
             conversation’s Files tab, with downloads limited to its members.
           </p>
           <p className="feature-note">
-            <Icon name="shield" /> Your administrator must enable file sharing
-            first.
+            <Icon name="shield" /> File sharing must be enabled and configured
+            for your workspace.
           </p>
         </article>
       </div>

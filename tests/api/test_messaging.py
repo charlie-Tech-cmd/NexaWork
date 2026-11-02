@@ -1,6 +1,9 @@
+from datetime import datetime, timezone
+
 from app.core.security.password import hash_password
 from app.models.conversation import Conversation
 from app.models.conversation_member import ConversationMember
+from app.models.message import Message
 from app.models.organization import Organization
 from app.models.user import User
 from app.services.messaging_service import create_or_get_direct_conversation
@@ -321,3 +324,155 @@ def test_messaging_api_enforces_pagination_and_cursor_boundaries(
             headers=headers,
         )
         assert response.status_code == 422
+
+
+def test_replies_and_seen_state_are_conversation_scoped(
+    client, db_session, organization
+):
+    sender = make_user(
+        db_session, organization.id, "messaging.reply.sender@example.com"
+    )
+    reader = make_user(
+        db_session, organization.id, "messaging.reply.reader@example.com"
+    )
+    outsider = make_user(
+        db_session, organization.id, "messaging.reply.outsider@example.com"
+    )
+    db_session.commit()
+
+    conversation = create_or_get_direct_conversation(
+        db_session, organization.id, sender.id, reader.id
+    )
+    sender_headers = login(client, sender.email)
+    reader_headers = login(client, reader.email)
+    original_response = client.post(
+        f"/api/v1/messaging/conversations/{conversation.id}/messages",
+        headers=sender_headers,
+        json={"body": "Original message"},
+    )
+    assert original_response.status_code == 201, original_response.text
+    original_id = original_response.json()["id"]
+
+    original = db_session.get(Message, original_id)
+    original.created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    db_session.commit()
+
+    reply_response = client.post(
+        f"/api/v1/messaging/conversations/{conversation.id}/messages",
+        headers=reader_headers,
+        json={
+            "body": "Reply text",
+            "reply_to_message_id": original_id,
+        },
+    )
+    assert reply_response.status_code == 201, reply_response.text
+    reply = reply_response.json()
+    assert reply["reply_to"] == {
+        "id": original_id,
+        "sender_id": sender.id,
+        "body": "Original message",
+    }
+    fetched_original = client.get(
+        (
+            f"/api/v1/messaging/conversations/{conversation.id}"
+            f"/messages/{original_id}"
+        ),
+        headers=reader_headers,
+    )
+    assert fetched_original.status_code == 200
+    assert fetched_original.json()["body"] == "Original message"
+
+    retry_key = "ca9102af-3447-4d3f-b49d-46aff61bd523"
+    first_retry = client.post(
+        f"/api/v1/messaging/conversations/{conversation.id}/messages",
+        headers=sender_headers,
+        json={
+            "body": "Retry-safe reply",
+            "reply_to_message_id": original_id,
+            "client_message_id": retry_key,
+        },
+    )
+    assert first_retry.status_code == 201
+    changed_retry = client.post(
+        f"/api/v1/messaging/conversations/{conversation.id}/messages",
+        headers=sender_headers,
+        json={
+            "body": "Retry-safe reply",
+            "reply_to_message_id": reply["id"],
+            "client_message_id": retry_key,
+        },
+    )
+    assert changed_retry.status_code == 409
+
+    other_conversation = create_or_get_direct_conversation(
+        db_session, organization.id, sender.id, outsider.id
+    )
+    other_message = client.post(
+        f"/api/v1/messaging/conversations/{other_conversation.id}/messages",
+        headers=sender_headers,
+        json={"body": "Private to another conversation"},
+    )
+    assert other_message.status_code == 201
+    invalid_reply = client.post(
+        f"/api/v1/messaging/conversations/{conversation.id}/messages",
+        headers=sender_headers,
+        json={
+            "body": "Invalid cross-conversation reply",
+            "reply_to_message_id": other_message.json()["id"],
+        },
+    )
+    assert invalid_reply.status_code == 400
+
+    read_state_url = (
+        f"/api/v1/messaging/conversations/{conversation.id}/read-state"
+    )
+    initial_state = client.get(read_state_url, headers=sender_headers)
+    assert initial_state.status_code == 200
+    reader_state = next(
+        member
+        for member in initial_state.json()["members"]
+        if member["user_id"] == reader.id
+    )
+    assert reader_state["last_read_at"] is None
+
+    mark_read_url = f"/api/v1/messaging/conversations/{conversation.id}/read"
+    marked = client.post(
+        mark_read_url,
+        headers=reader_headers,
+        json={"last_message_id": reply["id"]},
+    )
+    assert marked.status_code == 200
+    latest_read_at = marked.json()["last_read_at"]
+
+    sender_state = client.get(read_state_url, headers=sender_headers)
+    assert next(
+        member
+        for member in sender_state.json()["members"]
+        if member["user_id"] == reader.id
+    )["last_read_at"] == latest_read_at
+
+    earlier_mark = client.post(
+        mark_read_url,
+        headers=reader_headers,
+        json={"last_message_id": original_id},
+    )
+    assert earlier_mark.status_code == 200
+    assert earlier_mark.json()["last_read_at"] == latest_read_at
+
+    outsider_headers = login(client, outsider.email)
+    denied_state = client.get(read_state_url, headers=outsider_headers)
+    assert denied_state.status_code == 404
+    denied_mark = client.post(
+        mark_read_url,
+        headers=outsider_headers,
+        json={"last_message_id": reply["id"]},
+    )
+    assert denied_mark.status_code == 404
+    denied_message = client.get(
+        (
+            f"/api/v1/messaging/conversations/{conversation.id}"
+            f"/messages/{original_id}"
+        ),
+        headers=outsider_headers,
+    )
+    assert denied_message.status_code == 404

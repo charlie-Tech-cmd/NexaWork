@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -48,6 +49,13 @@ class Settings(BaseSettings):
             if host.strip()
         ]
 
+    @property
+    def attachment_uploads_enabled(self) -> bool:
+        return self.attachments_enabled and (
+            bool(self.file_scan_host.strip())
+            or self.allow_unscanned_development_files
+        )
+
     jwt_secret_key: str
     jwt_algorithm: Literal["HS256"] = "HS256"
     jwt_access_token_expire_minutes: int = Field(default=30, gt=0)
@@ -85,8 +93,14 @@ class Settings(BaseSettings):
         errors = []
         if self.allow_unscanned_development_files:
             errors.append("Unscanned file bypass is forbidden in production")
-        if self.attachments_enabled and (not self.persistent_local_storage or not self.file_scan_host or not self.messaging_rate_limits_enabled):
+        if self.attachments_enabled and (
+            not self.persistent_local_storage
+            or not self.file_scan_host.strip()
+            or not self.messaging_rate_limits_enabled
+        ):
             errors.append("Production files require persistent storage acknowledgement, scanner and rate limits")
+        if self.attachments_enabled and not Path(self.storage_local_root).is_absolute():
+            errors.append("STORAGE_LOCAL_ROOT must be an absolute path in production")
 
         if self.db_host.strip().lower() in {
             "localhost",

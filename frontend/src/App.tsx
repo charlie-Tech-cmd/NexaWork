@@ -7,6 +7,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -17,6 +18,7 @@ import {
   type RecordData,
   type Session,
 } from "./api";
+import { createMessagingApi, type FilePolicy } from "./messaging-api";
 import { Auth } from "./Auth";
 import { Directory, type Call } from "./Directory";
 import { Structure } from "./Structure";
@@ -29,7 +31,6 @@ const Messaging = lazy(() =>
 const navigation: { id: string; label: string; icon: IconName }[] = [
   { id: "overview", label: "Overview", icon: "overview" },
   { id: "messages", label: "Messages", icon: "message" },
-  { id: "files", label: "Files", icon: "file" },
   { id: "people", label: "People", icon: "people" },
   { id: "structure", label: "Organization", icon: "structure" },
   { id: "roles", label: "Roles & access", icon: "shield" },
@@ -280,20 +281,47 @@ function Workspace({
     },
     [session.token, signOut],
   );
+  const messagingApi = useMemo(
+    () =>
+      createMessagingApi(session.token, () =>
+        signOut("Your session ended. Please sign in again."),
+      ),
+    [session.token, signOut],
+  );
+  const filePolicy = useResource(
+    (signal) => messagingApi.policy(signal),
+    [session.id],
+  );
   const organization = useResource(
     async (signal) =>
       record(await call("/organizations/me", "GET", undefined, signal)),
     [session.id],
   );
   function navigate(next: string) {
+    if (next === "files" && !filePolicy.data?.enabled) next = "messages";
     setPage(next);
     setMenu(false);
     setSettingsNotice("");
   }
   useEffect(() => {
-    document.title = `${navigation.find((item) => item.id === page)?.label} · NexaWork`;
+    if (page === "files" && filePolicy.data && !filePolicy.data.enabled)
+      setPage("messages");
+  }, [filePolicy.data, page]);
+  useEffect(() => {
+    const pageTitle =
+      page === "files"
+        ? "Files"
+        : navigation.find((item) => item.id === page)?.label;
+    document.title = `${pageTitle} · NexaWork`;
     main.current?.focus();
   }, [page]);
+  const workspaceNavigation = filePolicy.data?.enabled
+    ? [
+        ...navigation.slice(0, 2),
+        { id: "files", label: "Files", icon: "file" as const },
+        ...navigation.slice(2),
+      ]
+    : navigation;
   return (
     <div className="workspace">
       <a className="skip-link" href="#main-content">
@@ -326,7 +354,7 @@ function Workspace({
         </div>
         <p className="nav-label">WORKSPACE</p>
         <nav aria-label="Workspace navigation">
-          {navigation.map((item) => (
+          {workspaceNavigation.map((item) => (
             <button
               key={item.id}
               aria-current={page === item.id ? "page" : undefined}
@@ -384,7 +412,8 @@ function Workspace({
           <span className="topbar-location">
             Workspace <span>/</span>{" "}
             <strong>
-              {navigation.find((item) => item.id === page)?.label}
+              {workspaceNavigation.find((item) => item.id === page)?.label ??
+                (page === "files" ? "Files" : "")}
             </strong>
           </span>
           <div className="topbar-right">
@@ -440,6 +469,7 @@ function Workspace({
                       session={session}
                       signOut={signOut}
                       initialView={page === "files" ? "files" : "messages"}
+                      policy={filePolicy}
                     />
                   </Suspense>
                 )}
