@@ -102,9 +102,7 @@ export function DataForm({
                   onClick={() => togglePasswordVisibility(field.name)}
                 >
                   <Icon
-                    name={
-                      visiblePasswords[field.name] ? "eye-off" : "eye"
-                    }
+                    name={visiblePasswords[field.name] ? "eye-off" : "eye"}
                   />
                 </button>
               </span>
@@ -116,9 +114,7 @@ export function DataForm({
                 required={!field.optional}
                 minLength={field.minLength}
                 maxLength={field.maxLength || 255}
-                autoComplete={
-                  field.type === "email" ? "email" : "off"
-                }
+                autoComplete={field.type === "email" ? "email" : "off"}
               />
             )}
           </label>
