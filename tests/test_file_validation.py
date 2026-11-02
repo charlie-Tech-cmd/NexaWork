@@ -31,12 +31,98 @@ class FileSecurityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             store = LocalStorage(root)
             key = "a" * 32
-            with store.create(key) as f: f.write(b"hello")
+            writer = store.create(key)
+            writer.write(b"hello")
+            writer.complete()
             with store.open(key) as f: self.assertEqual(f.read(), b"hello")
             self.assertEqual(Path(root, key).stat().st_mode & 0o777, 0o600)
-            with self.assertRaises(FileExistsError): store.create(key)
+            duplicate = store.create(key)
+            with self.assertRaises(FileExistsError):
+                duplicate.complete()
             with self.assertRaises(ValueError): store.open("../outside")
             store.delete(key); store.delete(key)
+
+    def test_staging_writer_publishes_only_after_complete(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = LocalStorage(root)
+            key = "b" * 32
+            writer = store.create(key)
+
+            writer.write(b"partial")
+            self.assertFalse(store.path(key).exists())
+            self.assertTrue(list(Path(root).glob(".staging-*")))
+
+            writer.complete()
+
+            with store.open(key) as stream:
+                self.assertEqual(stream.read(), b"partial")
+            self.assertFalse(list(Path(root).glob(".staging-*")))
+
+    def test_staging_writer_abort_discards_incomplete_object(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = LocalStorage(root)
+            key = "c" * 32
+            writer = store.create(key)
+
+            writer.write(b"partial")
+            writer.abort()
+            writer.abort()
+
+            self.assertFalse(store.path(key).exists())
+            self.assertFalse(list(Path(root).glob(".staging-*")))
+            with self.assertRaises(ValueError):
+                writer.write(b"later")
+
+    def test_staging_writer_never_overwrites_existing_object(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = LocalStorage(root)
+            key = "d" * 32
+
+            first = store.create(key)
+            first.write(b"original")
+            first.complete()
+
+            second = store.create(key)
+            second.write(b"replacement")
+            with self.assertRaises(FileExistsError):
+                second.complete()
+
+            with store.open(key) as stream:
+                self.assertEqual(stream.read(), b"original")
+            self.assertFalse(list(Path(root).glob(".staging-*")))
+
+    def test_staging_cleanup_can_be_retried_after_publication(self):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as root:
+            store = LocalStorage(root)
+            key = "e" * 32
+            writer = store.create(key)
+            writer.write(b"published")
+
+            original_unlink = Path.unlink
+            failed_once = False
+
+            def fail_first_staging_unlink(instance, *args, **kwargs):
+                nonlocal failed_once
+                if instance.name.startswith(".staging-") and not failed_once:
+                    failed_once = True
+                    raise OSError("Simulated staging cleanup failure")
+                return original_unlink(instance, *args, **kwargs)
+
+            with patch.object(Path, "unlink", fail_first_staging_unlink):
+                with self.assertRaises(OSError):
+                    writer.complete()
+
+                # Publication succeeded despite the staging cleanup failure.
+                self.assertTrue(store.path(key).exists())
+                self.assertTrue(list(Path(root).glob(".staging-*")))
+
+                writer.abort()
+
+            with store.open(key) as stream:
+                self.assertEqual(stream.read(), b"published")
+            self.assertFalse(list(Path(root).glob(".staging-*")))
 
     def test_storage_does_not_follow_object_symlinks(self):
         with tempfile.TemporaryDirectory() as root:
@@ -68,6 +154,34 @@ class ScannerProtocolTests(unittest.TestCase):
             client = MagicMock(); client.__enter__.return_value = client; client.recv.return_value = response
             with patch("app.services.file_validation.socket.create_connection", return_value=client):
                 with self.assertRaises(FileRejected): scan_file(io.BytesIO(b"abc"), "scanner.test", 3310, 30)
+
+    def test_staging_writer_abort_can_retry_failed_unlink(self):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as root:
+            store = LocalStorage(root)
+            key = "f" * 32
+            writer = store.create(key)
+            writer.write(b"partial")
+
+            original_unlink = Path.unlink
+            failed_once = False
+
+            def fail_first_staging_unlink(instance, *args, **kwargs):
+                nonlocal failed_once
+                if instance.name.startswith(".staging-") and not failed_once:
+                    failed_once = True
+                    raise OSError("Simulated staging cleanup failure")
+                return original_unlink(instance, *args, **kwargs)
+
+            with patch.object(Path, "unlink", fail_first_staging_unlink):
+                with self.assertRaises(OSError):
+                    writer.abort()
+
+                writer.abort()
+
+            self.assertFalse(store.path(key).exists())
+            self.assertFalse(list(Path(root).glob(".staging-*")))
 
 
 if __name__ == "__main__": unittest.main()

@@ -92,7 +92,9 @@ def test_cleanup_preserves_attached_objects_and_retries(db_session, data, tmp_pa
     attached = ready(db_session, org, cid, users[0].id)
     expired = ready(db_session, org, cid, users[0].id)
     for item in [attached, expired]:
-        with store.create(item.storage_key) as stream: stream.write(b"hello")
+        writer = store.create(item.storage_key)
+        writer.write(b"hello")
+        writer.complete()
     send_message(db_session, org, cid, users[0].id, "Keep", [attached.id])
     expired.expires_at = datetime.now(timezone.utc) - timedelta(days=1); db_session.commit()
     assert cleanup(db_session, store) == 1
@@ -169,3 +171,35 @@ def test_late_cancellation_does_not_abandon_committed_ready_upload(db_session, d
     assert files.abandon(db_session, org, users[0].id, item.id) is False
     db_session.refresh(item)
     assert item.status == "ready" and item.size_bytes == 5
+
+def test_cleanup_continues_after_unexpected_storage_error(db_session, data, tmp_path):
+    org, users, cid = data
+    store = LocalStorage(str(tmp_path))
+    failed = ready(db_session, org, cid, users[0].id)
+    successful = ready(db_session, org, cid, users[0].id)
+
+    for item in (failed, successful):
+        writer = store.create(item.storage_key)
+        writer.write(b"hello")
+        writer.complete()
+
+    now_utc = datetime.now(timezone.utc)
+    failed.expires_at = now_utc - timedelta(days=2)
+    successful.expires_at = now_utc - timedelta(days=1)
+    db_session.commit()
+
+    class UnreliableStorage:
+        def delete(self, key):
+            if key == failed.storage_key:
+                raise RuntimeError("Unexpected storage adapter failure")
+            store.delete(key)
+
+    assert cleanup(db_session, UnreliableStorage()) == 1
+
+    db_session.refresh(failed)
+    db_session.refresh(successful)
+    assert failed.status == "deleting"
+    assert failed.expires_at > datetime.now(timezone.utc).replace(tzinfo=None)
+    assert store.path(failed.storage_key).exists()
+    assert successful.status == "deleted"
+    assert not store.path(successful.storage_key).exists()

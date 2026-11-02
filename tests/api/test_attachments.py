@@ -8,6 +8,8 @@ from app.models.attachment import Attachment
 from app.models.message import Message
 from app.models.conversation_member import ConversationMember
 from app.services.messaging_service import create_group_conversation
+from app.services import attachment_service
+from app.integrations.storage.local import LocalStorage
 from tests.api.test_messaging import make_user, login
 
 
@@ -116,3 +118,146 @@ def test_equal_timestamp_conversation_pages_and_legacy_array(client, db_session,
     legacy = client.get(root, headers=auth)
     assert isinstance(legacy.json(), list) and 'rel="next"' in legacy.headers["link"]
     assert client.get(root + "/page?cursor=garbage", headers=auth).status_code == 400
+
+
+def test_upload_cleanup_delete_failure_preserves_retry_target(
+    client, db_session, file_workspace, monkeypatch
+):
+    a, _, _, c = file_workspace
+    underlying = LocalStorage(str(settings.storage_local_root))
+
+    class UnreliableStorage:
+        def create(self, key):
+            return underlying.create(key)
+
+        def open(self, key):
+            return underlying.open(key)
+
+        def delete(self, key):
+            raise RuntimeError("Unexpected storage deletion failure")
+
+    monkeypatch.setattr(
+        attachment_service, "storage", lambda: UnreliableStorage()
+    )
+
+    response = upload(
+        client,
+        login(client, a.email),
+        c.id,
+        data=b"not a real PDF",
+        filename="broken.pdf",
+    )
+
+    assert response.status_code == 415
+
+    db_session.expire_all()
+    item = db_session.scalar(
+        select(Attachment).where(
+            Attachment.organization_id == a.organization_id,
+            Attachment.filename == "broken.pdf",
+        )
+    )
+
+    assert item is not None
+    assert item.status == "deleting"
+    assert underlying.path(item.storage_key).exists()
+
+
+def test_upload_abandon_failure_does_not_delete_storage_object(
+    client, db_session, file_workspace, monkeypatch
+):
+    a, _, _, c = file_workspace
+    underlying = LocalStorage(str(settings.storage_local_root))
+
+    class UnreliableStorage:
+        def create(self, key):
+            return underlying.create(key)
+
+        def open(self, key):
+            return underlying.open(key)
+
+        def delete(self, key):
+            raise AssertionError("Storage deletion must not be attempted")
+
+    monkeypatch.setattr(
+        attachment_service, "storage", lambda: UnreliableStorage()
+    )
+
+    def fail_abandon(*args, **kwargs):
+        raise RuntimeError("Database abandonment failed")
+
+    monkeypatch.setattr(attachment_service, "abandon", fail_abandon)
+
+    response = upload(
+        client,
+        login(client, a.email),
+        c.id,
+        data=b"not a real PDF",
+        filename="abandon-failure.pdf",
+    )
+
+    assert response.status_code == 415
+
+    db_session.expire_all()
+    item = db_session.scalar(
+        select(Attachment).where(
+            Attachment.organization_id == a.organization_id,
+            Attachment.filename == "abandon-failure.pdf",
+        )
+    )
+
+    assert item is not None
+    assert item.status == "uploading"
+    assert underlying.path(item.storage_key).exists()
+
+
+def test_upload_abort_failure_does_not_interrupt_abandonment(
+    client, db_session, file_workspace, monkeypatch
+):
+    a, _, _, c = file_workspace
+    underlying = LocalStorage(str(settings.storage_local_root))
+
+    class BrokenWriter:
+        def __init__(self, writer):
+            self.writer = writer
+
+        def write(self, data):
+            raise RuntimeError("Original write failure")
+
+        def abort(self):
+            raise RuntimeError("Unexpected abort failure")
+
+    class UnreliableStorage:
+        def create(self, key):
+            return BrokenWriter(underlying.create(key))
+
+        def open(self, key):
+            return underlying.open(key)
+
+        def delete(self, key):
+            underlying.delete(key)
+
+    monkeypatch.setattr(
+        attachment_service, "storage", lambda: UnreliableStorage()
+    )
+
+    response = upload(
+        client,
+        login(client, a.email),
+        c.id,
+        data=b"hello",
+        filename="abort-failure.txt",
+    )
+
+    assert response.status_code == 503
+
+    db_session.expire_all()
+    item = db_session.scalar(
+        select(Attachment).where(
+            Attachment.organization_id == a.organization_id,
+            Attachment.filename == "abort-failure.txt",
+        )
+    )
+
+    assert item is not None
+    assert item.status == "deleting"

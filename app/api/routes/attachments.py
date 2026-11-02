@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 from typing import Annotated
 from urllib.parse import quote, unquote
 
@@ -19,6 +20,8 @@ from app.services.file_validation import FileRejected, validate_content, scan_fi
 from app.services.messaging_service import ConversationAccessError, MessagingValidationError
 from app.core.redis import check_rate_limit
 from redis.exceptions import RedisError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/messaging", tags=["attachments"])
 
@@ -112,7 +115,7 @@ async def upload(cid: Annotated[int, Path(gt=0)], request: Request, x_filename: 
                     raise HTTPException(413, "The file exceeds the upload limit")
                 digest.update(chunk)
                 await run_in_threadpool(writer.write, chunk)
-        await run_in_threadpool(writer.close)
+        await run_in_threadpool(writer.complete)
         writer = None
         if not size:
             raise FileRejected("Empty files cannot be shared")
@@ -145,25 +148,38 @@ async def upload(cid: Annotated[int, Path(gt=0)], request: Request, x_filename: 
             content_type,
         )
     except BaseException as exc:
-        # Cancellation/disconnects leave a durable cleanup target even if delete fails.
+        # Preserve the original failure while making cleanup best-effort.
         if writer:
             try:
-                await run_in_threadpool(writer.close)
-            except OSError:
-                pass  # The persisted reservation still allows cleanup.
-        await run_in_threadpool(db.rollback)
+                await run_in_threadpool(writer.abort)
+            except Exception:
+                logger.exception("attachment_upload_abort_failed attachment_id=%s", item_id)
+
         delete_object = False
         if item_id is not None:
             try:
-                delete_object = await run_in_threadpool(service.abandon, db, org_id, uid, item_id)
+                # abandon() rolls back and only marks an uploading reservation for deletion.
+                delete_object = await run_in_threadpool(
+                    service.abandon, db, org_id, uid, item_id
+                )
             except Exception:
+                logger.exception("attachment_upload_abandon_failed attachment_id=%s", item_id)
+                try:
+                    await run_in_threadpool(db.rollback)
+                except Exception:
+                    logger.exception("attachment_upload_rollback_failed attachment_id=%s", item_id)
+        else:
+            try:
                 await run_in_threadpool(db.rollback)
-        # A cancellation after final commit must not delete an already-ready object.
+            except Exception:
+                logger.exception("attachment_upload_rollback_failed")
+
+        # Never delete an object unless abandon() confirmed the reservation was abandoned.
         if delete_object and store:
             try:
                 await run_in_threadpool(store.delete, object_key)
-            except OSError:
-                pass  # Expired reservation remains for the cleanup runner.
+            except Exception:
+                logger.exception("attachment_upload_delete_failed attachment_id=%s", item_id)
         if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
             raise
         if isinstance(exc, HTTPException):
