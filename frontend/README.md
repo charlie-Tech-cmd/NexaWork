@@ -25,10 +25,10 @@ Sign in as a member, organization administrator, or with an employee ID. New org
 - Regions → branches → departments → teams, with parent-scoped listing and creation. Team creation includes the backend-required `department_id`.
 - Role listing, creation and inspection of assigned permissions.
 - Organization name/handle updates.
-- Direct/group conversations, paged history, private file attachments and a conversation-scoped Files view. See [setup and release gates](../docs/MESSAGING_FILES_SETUP.md).
+- Direct/group conversations, paged history, per-member seen status, replies that link back to and highlight the original message, private file attachments and a conversation-scoped Files view. Seen status updates while the conversation is open; delivery remains poll-based, not real-time. The Files navigation and conversation tab follow the authenticated backend policy; the upload picker also requires scanner configuration and a private writable storage directory. See [setup and release gates](../docs/MESSAGING_FILES_SETUP.md).
 - Loading, empty, validation, permission-denied, network failure, retry and session-expiry states.
 
-This first frontend does not include employee-record administration, role/permission assignment, account deactivation, super-admin operations, hierarchy editing, websocket delivery, presence, or read receipts. These remain explicit follow-on workflows, not inactive controls pretending to work. The broken admin dashboard aggregate endpoint is not used.
+This first frontend does not include employee-record administration, role/permission assignment, account deactivation, super-admin operations, hierarchy editing, websocket delivery, or presence. These remain explicit follow-on workflows, not inactive controls pretending to work. The broken admin dashboard aggregate endpoint is not used.
 
 ## Security and integration
 

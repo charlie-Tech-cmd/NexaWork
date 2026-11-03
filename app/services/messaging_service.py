@@ -8,7 +8,7 @@ import base64
 import hashlib
 import hmac
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.config import settings
 from app.models.organization import Organization
 from sqlalchemy.exc import IntegrityError
@@ -287,6 +287,7 @@ def send_message(
     body: str,
     attachment_ids: list[int] | None = None,
     client_message_id: str | None = None,
+    reply_to_message_id: int | None = None,
 ) -> Message:
     """Send a message only as an active member of the conversation."""
     _require_active_user(db, organization_id, sender_id)
@@ -300,12 +301,28 @@ def send_message(
     if len(body) > 10000:
         raise MessagingValidationError("Message body exceeds 10000 characters")
 
+    if reply_to_message_id is not None:
+        reply_target = db.scalar(
+            select(Message).where(
+                Message.id == reply_to_message_id,
+                Message.organization_id == organization_id,
+                Message.conversation_id == conversation_id,
+            )
+        )
+        if reply_target is None:
+            raise MessagingValidationError(
+                "Reply target is unavailable in this conversation"
+            )
+
     from app.services.attachment_service import authorize, claim, AttachmentConflict
     authorize(db, organization_id, conversation_id, sender_id, lock=True)
     ids = attachment_ids or []
     if ids and not settings.attachments_enabled:
         raise MessagingValidationError("File sharing is currently disabled")
-    fingerprint = hashlib.sha256(json.dumps([body, sorted(ids)], separators=(",", ":")).encode()).hexdigest()
+    fingerprint_values = [body, sorted(ids)]
+    if reply_to_message_id is not None:
+        fingerprint_values.append(reply_to_message_id)
+    fingerprint = hashlib.sha256(json.dumps(fingerprint_values, separators=(",", ":")).encode()).hexdigest()
 
     def existing_request():
         return db.scalar(select(Message).where(Message.organization_id == organization_id,
@@ -319,6 +336,7 @@ def send_message(
         return existing
     message = Message(conversation_id=conversation_id, organization_id=organization_id,
                       sender_id=sender_id, body=body, client_message_id=client_message_id,
+                      reply_to_message_id=reply_to_message_id,
                       request_hash=fingerprint if client_message_id else None)
     try:
         db.add(message)
@@ -343,6 +361,100 @@ def send_message(
     except Exception:
         db.rollback()
         raise
+
+
+def mark_conversation_read(
+    db: Session,
+    organization_id: int,
+    conversation_id: int,
+    user_id: int,
+    last_message_id: int,
+) -> ConversationMember:
+    _require_active_user(db, organization_id, user_id)
+    membership = _require_active_membership(
+        db, organization_id, conversation_id, user_id
+    )
+    message = db.scalar(
+        select(Message).where(
+            Message.id == last_message_id,
+            Message.organization_id == organization_id,
+            Message.conversation_id == conversation_id,
+        )
+    )
+    if message is None:
+        raise MessagingValidationError(
+            "Message is unavailable in this conversation"
+        )
+
+    read_at = message.created_at
+    if read_at.tzinfo is None:
+        read_at = read_at.replace(tzinfo=timezone.utc)
+    if membership.last_read_at is None:
+        membership.last_read_at = read_at
+    else:
+        current_read_at = membership.last_read_at
+        if current_read_at.tzinfo is None:
+            current_read_at = current_read_at.replace(tzinfo=timezone.utc)
+        if read_at <= current_read_at:
+            return membership
+        membership.last_read_at = read_at
+
+    db.commit()
+    db.refresh(membership)
+    return membership
+
+
+def conversation_read_state(
+    db: Session,
+    organization_id: int,
+    conversation_id: int,
+    user_id: int,
+) -> list[ConversationMember]:
+    _require_active_user(db, organization_id, user_id)
+    _require_active_membership(
+        db, organization_id, conversation_id, user_id
+    )
+    return list(
+        db.scalars(
+            select(ConversationMember)
+            .join(
+                User,
+                (User.id == ConversationMember.user_id)
+                & (User.organization_id == ConversationMember.organization_id),
+            )
+            .where(
+                ConversationMember.organization_id == organization_id,
+                ConversationMember.conversation_id == conversation_id,
+                ConversationMember.is_active.is_(True),
+                User.is_active.is_(True),
+                User.is_super_admin.is_(False),
+            )
+            .order_by(ConversationMember.user_id)
+        ).all()
+    )
+
+
+def get_message(
+    db: Session,
+    organization_id: int,
+    conversation_id: int,
+    user_id: int,
+    message_id: int,
+) -> Message:
+    _require_active_user(db, organization_id, user_id)
+    _require_active_membership(
+        db, organization_id, conversation_id, user_id
+    )
+    message = db.scalar(
+        select(Message).where(
+            Message.id == message_id,
+            Message.organization_id == organization_id,
+            Message.conversation_id == conversation_id,
+        )
+    )
+    if message is None:
+        raise ConversationAccessError("Message not found")
+    return message
 
 
 def list_messages(

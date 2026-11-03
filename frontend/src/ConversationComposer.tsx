@@ -19,19 +19,30 @@ type ComposerDraft = {
   ready: Map<File, Attachment>;
   retry: { fingerprint: string; key: string } | null;
 };
+export type ReplyTarget = {
+  id: number;
+  senderName: string;
+  body: string;
+};
 export type ComposerDrafts = RefObject<Map<number, ComposerDraft>>;
 export function ConversationComposer({
   api,
   cid,
   policy,
+  policyError,
   onSent,
   drafts,
+  replyTo,
+  onCancelReply,
 }: {
   api: MessagingApi;
   cid: number;
   policy: FilePolicy | null;
+  policyError: string;
   onSent: (m: Message) => void;
   drafts: ComposerDrafts;
+  replyTo: ReplyTarget | null;
+  onCancelReply: () => void;
 }) {
   const [body, setBody] = useState(() => drafts.current.get(cid)?.body || "");
   const [files, setFiles] = useState<File[]>(
@@ -47,6 +58,10 @@ export function ConversationComposer({
     drafts.current.get(cid)?.retry || null,
   );
   const input = useRef<HTMLInputElement>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (replyTo) textarea.current?.focus();
+  }, [replyTo]);
   useEffect(() => {
     drafts.current.set(cid, { body, files, ready, retry: retry.current });
   }, [body, files, ready, busy, cid, drafts]);
@@ -62,7 +77,10 @@ export function ConversationComposer({
       if (files.length) {
         if (!policy)
           throw new Error("File settings could not be loaded. Try again.");
-        checkFiles(files, policy);
+        if (files.length > policy.max_attachments)
+          throw new Error(`Choose up to ${policy.max_attachments} files.`);
+        const newFiles = files.filter((file) => !uploaded.has(file));
+        if (newFiles.length) checkFiles(newFiles, policy);
       }
       for (const file of files) {
         if (uploaded.has(file)) continue;
@@ -73,7 +91,11 @@ export function ConversationComposer({
         setReady(new Map(uploaded));
       }
       const ids = files.map((file) => uploaded.get(file)!.id);
-      const fingerprint = JSON.stringify([body.trim(), ids]);
+      const fingerprint = JSON.stringify([
+        body.trim(),
+        ids,
+        replyTo?.id ?? null,
+      ]);
       if (retry.current?.fingerprint !== fingerprint)
         retry.current = { fingerprint, key: crypto.randomUUID() };
       setBusy("Sending…");
@@ -83,6 +105,7 @@ export function ConversationComposer({
         ids,
         retry.current.key,
         controller.signal,
+        replyTo?.id,
       );
       if (!controller.signal.aborted) {
         onSent(message);
@@ -90,6 +113,7 @@ export function ConversationComposer({
         setFiles([]);
         setReady(new Map());
         retry.current = null;
+        onCancelReply();
         if (input.current) input.current.value = "";
       }
     } catch (cause) {
@@ -110,7 +134,25 @@ export function ConversationComposer({
   return (
     <form className="message-composer" onSubmit={send}>
       <label htmlFor={`message-${cid}`}>Message</label>
+      {replyTo && (
+        <div className="reply-composer">
+          <div>
+            <strong>Replying to {replyTo.senderName}</strong>
+            <p>{replyTo.body}</p>
+          </div>
+          <button
+            type="button"
+            className="text-button"
+            onClick={onCancelReply}
+            disabled={!!busy}
+            aria-label="Cancel reply"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       <textarea
+        ref={textarea}
         id={`message-${cid}`}
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -161,7 +203,7 @@ export function ConversationComposer({
       )}
       <div className="composer-actions">
         <label
-          className={`secondary file-picker ${!policy?.enabled || busy ? "file-picker-disabled" : ""}`}
+          className={`secondary file-picker ${!policy?.uploads_enabled || busy ? "file-picker-disabled" : ""}`}
         >
           Attach files
           <input
@@ -169,7 +211,7 @@ export function ConversationComposer({
             type="file"
             multiple
             accept={policy?.extensions.join(",")}
-            disabled={!policy?.enabled || !!busy}
+            disabled={!policy?.enabled || !policy.uploads_enabled || !!busy}
             onChange={(e) => {
               try {
                 const selected = [
@@ -202,13 +244,25 @@ export function ConversationComposer({
           Send message
         </button>
       </div>
-      {!policy?.enabled && (
+      {!policy && (
         <p className="muted composer-hint">
-          File sharing is unavailable until your workspace administrator
-          configures secure storage.
+          {policyError
+            ? "File-sharing settings could not be loaded. Retry the request above."
+            : "Checking file-sharing availability…"}
         </p>
       )}
-      {policy?.enabled && (
+      {policy && !policy.enabled && (
+        <p className="muted composer-hint">
+          File sharing is disabled for this workspace.
+        </p>
+      )}
+      {policy?.enabled && !policy.uploads_enabled && (
+        <p className="muted composer-hint">
+          File uploads are unavailable until secure storage and safety scanning
+          are configured.
+        </p>
+      )}
+      {policy?.uploads_enabled && (
         <p className="muted composer-hint">
           TXT, PDF, PNG or JPEG · up to {Math.floor(policy.max_bytes / 1048576)}{" "}
           MB each · {policy.max_attachments} files per message

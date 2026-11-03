@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 from typing import Annotated
 from urllib.parse import quote, unquote
 
@@ -13,12 +14,18 @@ from app.db.session import get_db
 from app.core.config import settings
 from app.models.user import User
 from app.models.organization import Organization
-from app.schemas.attachment import AttachmentResponse, AttachmentPage
+from app.schemas.attachment import (
+    AttachmentPage,
+    AttachmentResponse,
+    FilePolicyResponse,
+)
 from app.services import attachment_service as service
 from app.services.file_validation import FileRejected, validate_content, scan_file
 from app.services.messaging_service import ConversationAccessError, MessagingValidationError
 from app.core.redis import check_rate_limit
 from redis.exceptions import RedisError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/messaging", tags=["attachments"])
 
@@ -40,6 +47,26 @@ def available():
         raise HTTPException(503, "File sharing is not configured for this workspace")
 
 
+def uploads_available():
+    available()
+    if not uploads_ready():
+        raise HTTPException(
+            503,
+            "File uploads are not configured or private storage is unavailable.",
+        )
+
+
+def uploads_ready() -> bool:
+    if not settings.attachment_uploads_enabled:
+        return False
+    try:
+        service.storage()
+    except OSError:
+        logger.exception("attachment_storage_not_ready")
+        return False
+    return True
+
+
 def translate(exc):
     if isinstance(exc, ConversationAccessError):
         return HTTPException(404, "Conversation or file not found")
@@ -56,9 +83,11 @@ def translate(exc):
     return HTTPException(503, "File storage or safety scanning is temporarily unavailable")
 
 
-@router.get("/file-policy")
+@router.get("/file-policy", response_model=FilePolicyResponse)
 def policy(user: User = Depends(get_current_user)):
-    return {"enabled": settings.attachments_enabled, "max_bytes": settings.attachment_max_bytes,
+    return {"enabled": settings.attachments_enabled,
+            "uploads_enabled": uploads_ready(),
+            "max_bytes": settings.attachment_max_bytes,
             "max_attachments": settings.attachment_max_per_message, "extensions": [
                 ".txt",
                 ".pdf",
@@ -79,7 +108,7 @@ def policy(user: User = Depends(get_current_user)):
 async def upload(cid: Annotated[int, Path(gt=0)], request: Request, x_filename: str = Header(max_length=3000),
                  user: User = Depends(get_current_user), org: Organization = Depends(get_current_organization),
                  db: Session = Depends(get_db)):
-    available()
+    uploads_available()
     org_id, uid = org.id, user.id
     if cid <= 0:
         raise HTTPException(422, "Invalid conversation ID")
@@ -112,7 +141,7 @@ async def upload(cid: Annotated[int, Path(gt=0)], request: Request, x_filename: 
                     raise HTTPException(413, "The file exceeds the upload limit")
                 digest.update(chunk)
                 await run_in_threadpool(writer.write, chunk)
-        await run_in_threadpool(writer.close)
+        await run_in_threadpool(writer.complete)
         writer = None
         if not size:
             raise FileRejected("Empty files cannot be shared")
@@ -123,7 +152,7 @@ async def upload(cid: Annotated[int, Path(gt=0)], request: Request, x_filename: 
                     try:
                         scan_file(
                             stream,
-                            settings.file_scan_host,
+                            settings.file_scan_host.strip(),
                             settings.file_scan_port,
                             settings.file_scan_timeout,
                         )
@@ -145,25 +174,38 @@ async def upload(cid: Annotated[int, Path(gt=0)], request: Request, x_filename: 
             content_type,
         )
     except BaseException as exc:
-        # Cancellation/disconnects leave a durable cleanup target even if delete fails.
+        # Preserve the original failure while making cleanup best-effort.
         if writer:
             try:
-                await run_in_threadpool(writer.close)
-            except OSError:
-                pass  # The persisted reservation still allows cleanup.
-        await run_in_threadpool(db.rollback)
+                await run_in_threadpool(writer.abort)
+            except Exception:
+                logger.exception("attachment_upload_abort_failed attachment_id=%s", item_id)
+
         delete_object = False
         if item_id is not None:
             try:
-                delete_object = await run_in_threadpool(service.abandon, db, org_id, uid, item_id)
+                # abandon() rolls back and only marks an uploading reservation for deletion.
+                delete_object = await run_in_threadpool(
+                    service.abandon, db, org_id, uid, item_id
+                )
             except Exception:
+                logger.exception("attachment_upload_abandon_failed attachment_id=%s", item_id)
+                try:
+                    await run_in_threadpool(db.rollback)
+                except Exception:
+                    logger.exception("attachment_upload_rollback_failed attachment_id=%s", item_id)
+        else:
+            try:
                 await run_in_threadpool(db.rollback)
-        # A cancellation after final commit must not delete an already-ready object.
+            except Exception:
+                logger.exception("attachment_upload_rollback_failed")
+
+        # Never delete an object unless abandon() confirmed the reservation was abandoned.
         if delete_object and store:
             try:
                 await run_in_threadpool(store.delete, object_key)
-            except OSError:
-                pass  # Expired reservation remains for the cleanup runner.
+            except Exception:
+                logger.exception("attachment_upload_delete_failed attachment_id=%s", item_id)
         if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
             raise
         if isinstance(exc, HTTPException):
@@ -186,6 +228,7 @@ def list_files(cid: Annotated[
     le=100,
 ),
                user: User = Depends(get_current_user), org: Organization = Depends(get_current_organization), db: Session = Depends(get_db)):
+    available()
     try:
         items, cursor = service.page(db, org.id, cid, user.id, before_id, limit)
         return AttachmentPage(items=items, next_cursor=cursor)
@@ -201,6 +244,7 @@ def metadata(
     org: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    available()
     try:
         return service.get_attachment(db, org.id, cid, user.id, aid)
     except ValueError as exc:
@@ -215,6 +259,7 @@ def download(
     org: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    available()
     if settings.messaging_rate_limits_enabled:
         try:
             allowed = check_rate_limit(f"messaging:download:{org.id}:{user.id}", 120, 60)
@@ -261,6 +306,7 @@ def remove(
     org: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    available()
     try:
         return service.request_delete(db, org.id, cid, user.id, aid)
     except (ValueError, PermissionError) as exc:

@@ -88,6 +88,15 @@ test("network failure offers recovery", async () => {
       "Could not reach your workspace. Check your connection and try again.",
   });
 });
+test("request timeouts identify a slow workspace connection", async () => {
+  globalThis.fetch = async () => {
+    throw new DOMException("request timed out", "TimeoutError");
+  };
+  await assert.rejects(request("/users"), {
+    message:
+      "Your workspace request timed out. Check that the local API and its database are reachable, then try again.",
+  });
+});
 test("malformed successful responses are rejected", async () => {
   globalThis.fetch = async () => new Response("<html>proxy error</html>");
   await assert.rejects(request("/users"), {

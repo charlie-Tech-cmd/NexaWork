@@ -7,6 +7,7 @@ from app.api.dependencies import (
     get_current_user,
 )
 from app.db.session import get_db
+from app.core.config import settings
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.messaging import (
@@ -16,7 +17,11 @@ from app.schemas.messaging import (
     GroupConversationCreate,
     MessageCreate,
     MessagePage,
+    MessageReplyPreview,
     MessageResponse,
+    ConversationReadMember,
+    ConversationReadRequest,
+    ConversationReadState,
 )
 from app.services.messaging_service import (
     ConversationAccessError,
@@ -26,6 +31,9 @@ from app.services.messaging_service import (
     list_conversations,
     list_messages,
     send_message,
+    get_message,
+    mark_conversation_read,
+    conversation_read_state,
     conversation_page, conversation_members,
 )
 
@@ -161,6 +169,11 @@ def create_message(
     current_organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ):
+    if payload.attachment_ids and not settings.attachments_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="File sharing is not configured for this workspace",
+        )
     protect_write(current_organization.id, current_user.id, "send", 60)
     try:
         message = send_message(
@@ -171,6 +184,7 @@ def create_message(
             body=payload.body,
             attachment_ids=payload.attachment_ids,
             client_message_id=str(payload.client_message_id) if payload.client_message_id else None,
+            reply_to_message_id=payload.reply_to_message_id,
         )
         return message_responses(db, current_organization.id, conversation_id, [message])[0]
     except ValueError as exc:
@@ -211,11 +225,129 @@ def get_messages(
         _raise_service_error(exc)
 
 
+@router.get(
+    "/conversations/{conversation_id}/messages/{message_id}",
+    response_model=MessageResponse,
+)
+def get_message_by_id(
+    conversation_id: int,
+    message_id: int,
+    current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
+    db: Session = Depends(get_db),
+):
+    try:
+        message = get_message(
+            db,
+            current_organization.id,
+            conversation_id,
+            current_user.id,
+            message_id,
+        )
+        return message_responses(
+            db, current_organization.id, conversation_id, [message]
+        )[0]
+    except ValueError as exc:
+        _raise_service_error(exc)
+
+
+@router.post(
+    "/conversations/{conversation_id}/read",
+    response_model=ConversationReadMember,
+)
+def mark_messages_read(
+    conversation_id: int,
+    payload: ConversationReadRequest,
+    current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
+    db: Session = Depends(get_db),
+):
+    protect_write(current_organization.id, current_user.id, "read", 120)
+    try:
+        membership = mark_conversation_read(
+            db,
+            current_organization.id,
+            conversation_id,
+            current_user.id,
+            payload.last_message_id,
+        )
+        return membership
+    except ValueError as exc:
+        _raise_service_error(exc)
+
+
+@router.get(
+    "/conversations/{conversation_id}/read-state",
+    response_model=ConversationReadState,
+)
+def get_conversation_read_state(
+    conversation_id: int,
+    current_user: User = Depends(get_current_user),
+    current_organization: Organization = Depends(get_current_organization),
+    db: Session = Depends(get_db),
+):
+    try:
+        members = conversation_read_state(
+            db,
+            current_organization.id,
+            conversation_id,
+            current_user.id,
+        )
+        return ConversationReadState(
+            members=[
+                ConversationReadMember.model_validate(member)
+                for member in members
+            ]
+        )
+    except ValueError as exc:
+        _raise_service_error(exc)
+
+
 def message_responses(db, org_id, cid, messages):
     from app.services.attachment_service import for_messages
     from app.schemas.attachment import AttachmentResponse
-    files = for_messages(db, org_id, cid, messages)
-    return [MessageResponse.model_validate(message).model_copy(update={"attachments": [AttachmentResponse.model_validate(a) for a in files[message.id]]}) for message in messages]
+    reply_ids = {
+        message.reply_to_message_id
+        for message in messages
+        if message.reply_to_message_id is not None
+    }
+    replies = {}
+    if reply_ids:
+        from sqlalchemy import select
+        from app.models.message import Message
+
+        replies = {
+            message.id: MessageReplyPreview(
+                id=message.id,
+                sender_id=message.sender_id,
+                body=message.body,
+            )
+            for message in db.scalars(
+                select(Message).where(
+                    Message.organization_id == org_id,
+                    Message.conversation_id == cid,
+                    Message.id.in_(reply_ids),
+                )
+            )
+        }
+
+    files = (
+        for_messages(db, org_id, cid, messages)
+        if settings.attachments_enabled
+        else {}
+    )
+    return [
+        MessageResponse.model_validate(message).model_copy(
+            update={
+                "attachments": [
+                    AttachmentResponse.model_validate(attachment)
+                    for attachment in files.get(message.id, [])
+                ],
+                "reply_to": replies.get(message.reply_to_message_id),
+            }
+        )
+        for message in messages
+    ]
 
 
 @router.get("/conversations/page", response_model=ConversationPage)

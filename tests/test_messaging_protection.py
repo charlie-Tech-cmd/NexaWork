@@ -38,6 +38,7 @@ def test_production_cannot_enable_unscanned_or_unconfigured_files():
     assert production(
         attachments_enabled=True,
         persistent_local_storage=True,
+        storage_local_root="/srv/nexawork/private-files",
         file_scan_host="private-scanner.invalid",
         messaging_rate_limits_enabled=True,
     ).attachments_enabled

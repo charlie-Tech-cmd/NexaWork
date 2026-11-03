@@ -25,8 +25,11 @@ def cleanup(db, store, limit=100):
     for aid, key in keys:
         try:
             store.delete(key)
-        except OSError:
-            logger.warning("attachment_cleanup_retry attachment_id=%s", aid)
+        except Exception:
+            logger.exception(
+                "attachment_cleanup_retry attachment_id=%s",
+                aid,
+            )
             continue
         row = db.get(Attachment, aid)
         if row and row.status == "deleting":

@@ -184,6 +184,36 @@ select {
 input::placeholder {
   color: var(--muted);
 }
+.password-input-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.password-input-wrap input {
+  padding-right: 48px;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 5px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+.password-toggle:hover {
+  background: var(--canvas);
+  color: var(--ink);
+}
+.password-toggle svg {
+  width: 20px;
+  height: 20px;
+}
 .form-actions {
   display: flex;
   gap: 10px;

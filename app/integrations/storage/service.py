@@ -2,8 +2,22 @@
 from typing import BinaryIO, Protocol
 
 
+class StorageWriter(Protocol):
+    def write(self, data: bytes) -> int:
+        """Write a chunk to an unpublished private object."""
+        ...
+
+    def complete(self) -> None:
+        """Publish the fully written object."""
+        ...
+
+    def abort(self) -> None:
+        """Discard an unpublished object. Safe to call more than once."""
+        ...
+
+
 class StorageService(Protocol):
-    def create(self, key: str) -> BinaryIO:
+    def create(self, key: str) -> StorageWriter:
         """Create a new private object exclusively; never overwrite an existing key."""
         ...
 
