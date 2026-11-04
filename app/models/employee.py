@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -17,6 +18,18 @@ class Employee(Base):
     __tablename__ = "employees"
 
     __table_args__ = (
+        CheckConstraint(
+            "email_verification_status IN ('unverified', 'verified')",
+            name="ck_employees_email_verification_status",
+        ),
+        CheckConstraint(
+            "approval_status IN ('pending', 'approved', 'rejected')",
+            name="ck_employees_approval_status",
+        ),
+        CheckConstraint(
+            "account_status IN ('active', 'disabled')",
+            name="ck_employees_account_status",
+        ),
         UniqueConstraint(
             "user_id",
             name="uq_employees_user_id",
@@ -78,6 +91,41 @@ class Employee(Base):
 
     profile_picture: Mapped[str | None] = mapped_column(
         String(500),
+        nullable=True,
+    )
+
+    email_verification_status: Mapped[str] = mapped_column(
+        String(20),
+        default="verified",
+        nullable=False,
+    )
+
+    approval_status: Mapped[str] = mapped_column(
+        String(20),
+        default="approved",
+        nullable=False,
+    )
+
+    account_status: Mapped[str] = mapped_column(
+        String(20),
+        default="active",
+        nullable=False,
+    )
+
+    verification_token: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    approval_reason: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    account_status_reason: Mapped[str | None] = mapped_column(
+        String(255),
         nullable=True,
     )
 

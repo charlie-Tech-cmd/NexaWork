@@ -91,6 +91,32 @@ def test_create_super_admin_rejects_missing_password(db_session):
         )
 
 
+def test_create_super_admin_rejects_password_shorter_than_eight_characters(
+    db_session,
+):
+    with pytest.raises(
+        ValueError,
+        match="Password must be at least 8 characters",
+    ):
+        create_super_admin(
+            db_session,
+            email="owner@nexawork.com",
+            full_name="NexaWork Owner",
+            password="1234567",
+        )
+
+
+def test_create_super_admin_accepts_eight_character_password(db_session):
+    user = create_super_admin(
+        db_session,
+        email="owner@nexawork.com",
+        full_name="NexaWork Owner",
+        password="12345678",
+    )
+
+    assert password_hasher.verify(user.password_hash, "12345678")
+
+
 def test_created_super_admin_is_persisted_as_platform_user(db_session):
     create_super_admin(
         db_session,

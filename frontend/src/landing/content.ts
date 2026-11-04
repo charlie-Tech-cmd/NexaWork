@@ -99,12 +99,24 @@ export const dayScenes = [
 ] as const;
 export function publicView(
   pathname: string,
-): "landing" | "login" | "onboard" | "reset" | "workspace" | "not-found" {
+):
+  | "landing"
+  | "login"
+  | "onboard"
+  | "reset"
+  | "join"
+  | "accept-invitation"
+  | "verify-email"
+  | "workspace"
+  | "not-found" {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/") return "landing";
   if (path === "/sign-in") return "login";
   if (path === "/get-started") return "onboard";
   if (path === "/reset-password") return "reset";
+  if (path === "/join") return "join";
+  if (path === "/accept-invitation") return "accept-invitation";
+  if (path === "/verify-email") return "verify-email";
   if (path === "/workspace") return "workspace";
   return "not-found";
 }

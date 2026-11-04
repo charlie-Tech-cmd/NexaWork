@@ -28,6 +28,9 @@ def create_super_admin(
     if not password:
         raise ValueError("Password is required.")
 
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters.")
+
     existing_user = db.scalar(
         select(User).where(User.email == normalized_email)
     )

@@ -221,6 +221,115 @@ input::placeholder {
   width: 20px;
   height: 20px;
 }
+.onboarding-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 18px;
+  background: var(--canvas);
+}
+.onboarding-card {
+  width: min(100%, 560px);
+  padding: clamp(24px, 5vw, 48px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+.onboarding-card > .wordmark {
+  margin-bottom: 36px;
+}
+.onboarding-card > .notice {
+  margin-block: 18px;
+}
+.onboarding-card .data-form {
+  margin-top: 24px;
+}
+.onboarding-field {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.onboarding-signin {
+  margin: 28px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+.onboarding-resend {
+  display: block;
+  margin: 18px auto 0;
+}
+.onboarding-signin a {
+  color: var(--action);
+  font-weight: 600;
+}
+.onboarding-code-reveal {
+  display: grid;
+  gap: 8px;
+  padding: 20px 24px;
+}
+.onboarding-code-reveal code {
+  overflow-wrap: anywhere;
+  color: var(--action);
+  font-size: 18px;
+  font-weight: 700;
+}
+.onboarding-list {
+  display: grid;
+}
+.onboarding-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.onboarding-filters input,
+.onboarding-filters select {
+  min-width: 150px;
+  min-height: 38px;
+}
+.onboarding-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.onboarding-row:last-child {
+  border-bottom: 0;
+}
+.onboarding-row p {
+  margin: 4px 0 0;
+}
+.onboarding-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.onboarding-actions .secondary,
+.onboarding-row > .secondary {
+  min-height: 36px;
+  padding: 7px 12px;
+}
+@media (max-width: 640px) {
+  .onboarding-filters {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .onboarding-filters label,
+  .onboarding-filters input,
+  .onboarding-filters select {
+    width: 100%;
+  }
+  .onboarding-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
 .form-actions {
   display: flex;
   gap: 10px;
@@ -975,6 +1084,10 @@ dd {
 }
 .auth-links button {
   font-size: 12px;
+}
+.auth-links a {
+  color: var(--action);
+  font-weight: 600;
 }
 .session-note {
   color: var(--muted);

@@ -3,7 +3,10 @@ from app.models.branch import Branch
 from app.models.audit_log import AuditLog
 from app.models.department import Department
 from app.models.employee import Employee
+from app.models.employee_invitation import EmployeeInvitation
+from app.models.employee_registration import EmployeeRegistrationRequest
 from app.models.organization import Organization
+from app.models.organization_registration_code import OrganizationRegistrationCode
 from app.models.region import Region
 from app.models.permission import Permission
 from app.models.role import Role
@@ -35,5 +38,8 @@ __all__ = [
     "User",
     "Team",
     "PasswordResetToken",
+    "EmployeeInvitation",
+    "EmployeeRegistrationRequest",
+    "OrganizationRegistrationCode",
 ]
 from app.models.attachment import Attachment

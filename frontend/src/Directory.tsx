@@ -48,9 +48,9 @@ export function Directory({ call }: { call: Call }) {
           ...personFields,
           {
             name: "password",
-            label: "Temporary password (12 characters minimum)",
+            label: "Temporary password (8 characters minimum)",
             type: "password",
-            minLength: 12,
+            minLength: 8,
           },
           {
             name: "confirm_password",

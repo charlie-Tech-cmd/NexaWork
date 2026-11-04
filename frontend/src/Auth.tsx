@@ -36,9 +36,9 @@ export function Auth({
     { name: "admin_email", label: "Work email", type: "email" },
     {
       name: "admin_password",
-      label: "Password (12 characters minimum)",
+      label: "Password (8 characters minimum)",
       type: "password",
-      minLength: 12,
+      minLength: 8,
     },
     {
       name: "admin_confirm_password",
@@ -56,9 +56,9 @@ export function Auth({
               { name: "token", label: "Reset token", value: initialToken },
               {
                 name: "new_password",
-                label: "New password (12 characters minimum)",
+                label: "New password (8 characters minimum)",
                 type: "password",
-                minLength: 12,
+                minLength: 8,
               },
             ]
           : [
@@ -196,6 +196,10 @@ export function Auth({
                   <button onClick={() => change("onboard")}>
                     Create a workspace
                   </button>
+                </p>
+                <p>
+                  Joining an existing organization?{" "}
+                  <a href="/join">Request employee access</a>
                 </p>
               </>
             ) : (

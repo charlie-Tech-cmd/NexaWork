@@ -40,8 +40,8 @@ class OrganizationOnboardingCreate(BaseModel):
     organization_name: str = Field(min_length=2, max_length=255)
     organization_slug: str = Field(min_length=2, max_length=100)
     admin_email: str
-    admin_password: str
-    admin_confirm_password: str
+    admin_password: str = Field(min_length=8, max_length=255)
+    admin_confirm_password: str = Field(min_length=8, max_length=255)
     admin_full_name: str = Field(min_length=2, max_length=255)
 
     @model_validator(mode="after")

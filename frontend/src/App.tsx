@@ -23,6 +23,7 @@ import { Auth } from "./Auth";
 import { Directory, type Call } from "./Directory";
 import { Structure } from "./Structure";
 import { Roles } from "./Roles";
+import { OnboardingAdmin, PublicOnboarding } from "./Onboarding";
 import { DataForm, ErrorState, PageHeading, Status } from "./ui";
 import { useResource } from "./useResource";
 const Messaging = lazy(() =>
@@ -321,7 +322,9 @@ function Workspace({
     const pageTitle =
       page === "files"
         ? "Files"
-        : navigation.find((item) => item.id === page)?.label;
+        : page === "onboarding"
+          ? "Onboarding"
+          : navigation.find((item) => item.id === page)?.label;
     document.title = `${pageTitle} · NexaWork`;
     main.current?.focus();
   }, [page]);
@@ -332,6 +335,13 @@ function Workspace({
         ...navigation.slice(2),
       ]
     : navigation;
+  const visibleNavigation =
+    session.mode === "admin"
+      ? [
+          ...workspaceNavigation,
+          { id: "onboarding", label: "Onboarding", icon: "people" as const },
+        ]
+      : workspaceNavigation;
   return (
     <div className="workspace">
       <a className="skip-link" href="#main-content">
@@ -364,7 +374,7 @@ function Workspace({
         </div>
         <p className="nav-label">WORKSPACE</p>
         <nav aria-label="Workspace navigation">
-          {workspaceNavigation.map((item) => (
+          {visibleNavigation.map((item) => (
             <button
               key={item.id}
               aria-current={page === item.id ? "page" : undefined}
@@ -422,7 +432,7 @@ function Workspace({
           <span className="topbar-location">
             Workspace <span>/</span>{" "}
             <strong>
-              {workspaceNavigation.find((item) => item.id === page)?.label ??
+              {visibleNavigation.find((item) => item.id === page)?.label ??
                 (page === "files" ? "Files" : "")}
             </strong>
           </span>
@@ -504,6 +514,7 @@ function Workspace({
                   <Structure call={call} organization={organization.data} />
                 )}{" "}
                 {page === "roles" && <Roles call={call} />}{" "}
+                {page === "onboarding" && <OnboardingAdmin call={call} />}{" "}
                 {page === "settings" && (
                   <Settings
                     session={session}
@@ -534,6 +545,9 @@ export default function App() {
   const [resetToken] = useState(() =>
     resetTokenFromSearch(window.location.search),
   );
+  const [onboardingToken] = useState(() =>
+    resetTokenFromSearch(window.location.search),
+  );
   const view = publicView(path);
   useEffect(() => {
     const handlePop = () => setPath(window.location.pathname);
@@ -542,7 +556,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (
-      view === "reset" &&
+      ["reset", "accept-invitation", "verify-email"].includes(view) &&
       new URLSearchParams(window.location.search).has("token")
     ) {
       const url = new URL(window.location.href);
@@ -559,6 +573,10 @@ export default function App() {
     }
     if (view === "login") document.title = "Sign In · NexaWork";
     if (view === "onboard") document.title = "Create Your Workspace · NexaWork";
+    if (view === "join") document.title = "Join Your Organization · NexaWork";
+    if (view === "accept-invitation")
+      document.title = "Accept Invitation · NexaWork";
+    if (view === "verify-email") document.title = "Verify Email · NexaWork";
   }, [view, session]);
   const signOut = useCallback((notice = "") => {
     setSession(null);
@@ -575,6 +593,11 @@ export default function App() {
   if (view === "landing") return <Landing />;
   if (view === "workspace" && session)
     return <Workspace session={session} signOut={signOut} />;
+  if (view === "join") return <PublicOnboarding mode="register" />;
+  if (view === "accept-invitation")
+    return <PublicOnboarding mode="accept" token={onboardingToken} />;
+  if (view === "verify-email")
+    return <PublicOnboarding mode="verify" token={onboardingToken} />;
   if (view === "not-found")
     return (
       <main className="landing-not-found">

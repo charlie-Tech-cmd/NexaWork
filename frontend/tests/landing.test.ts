@@ -22,6 +22,9 @@ test("public URLs resolve to distinct onboarding, login, and protected workspace
   assert.equal(publicView("/workspace"), "workspace");
   assert.equal(publicView("/reset-password"), "reset");
   assert.equal(publicView("/reset-password/"), "reset");
+  assert.equal(publicView("/join"), "join");
+  assert.equal(publicView("/accept-invitation"), "accept-invitation");
+  assert.equal(publicView("/verify-email"), "verify-email");
 });
 
 test("reset token is extracted from the email link query string", () => {

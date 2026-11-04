@@ -1,9 +1,9 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 class AdminUserCreate(BaseModel):
     email: EmailStr
-    password: str
-    confirm_password: str
+    password: str = Field(min_length=8, max_length=255)
+    confirm_password: str = Field(min_length=8, max_length=255)
     full_name: str
 
     @model_validator(mode="after")
@@ -31,7 +31,7 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    new_password: str
+    new_password: str = Field(min_length=8, max_length=255)
 
 
 class UserResponse(BaseModel):
