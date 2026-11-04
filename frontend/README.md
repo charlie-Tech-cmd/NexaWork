@@ -69,10 +69,12 @@ Office photos are self-hosted in `public/images` with responsive sources, lazy
 loading below the fold, alt text and an image-error fallback. Attribution and
 license sources are recorded in `../.interface-forge/LANDING-DESIGN.md`.
 The landing page highlights implemented direct/group messaging and private file
-sharing, with file availability explicitly conditional on workspace enablement.
-Channels, announcements, meetings and AI remain marked Planned. Illustrative
-interface previews are labeled as sample content, not live screenshots. It makes
-no customer, metric, legal page or public-contact claims.
+sharing, channels and company announcements. File availability is explicitly
+conditional on workspace enablement; channel creation and announcement
+publishing follow organization role permissions. Meetings and the AI workplace
+assistant remain marked Planned. Illustrative interface previews are labeled
+as sample content, not live screenshots. It makes no customer, metric, legal
+page or public-contact claims.
 
 ## Brand system
 

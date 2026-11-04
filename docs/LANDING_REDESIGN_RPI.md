@@ -22,7 +22,7 @@ Direction: calm, precise, human. Fluid typography, generous space, quiet borders
 
 Preview tabs support pointer, arrows, Home and End. Fictional sample content is labeled explicitly. Sidebar/file entries remain illustrations. The composer is now a browser-only messaging demo, described below; file entries are not download controls. Actual links open `/sign-in` and `/get-started`. Mobile menu supports Escape/focus restoration and selection/outside dismissal.
 
-Private files require administrator enablement; downloads are limited to conversation members. No presence/read-receipt/realtime, public-link, production activation, endorsement or usage-statistic claims. Channels, announcements, meetings and AI stay planned.
+Private files require administrator enablement; downloads are limited to conversation members. No presence/read-receipt/realtime, public-link, production activation, endorsement or usage-statistic claims. At the 2026-10-30 review, channels, announcements, meetings and AI stayed planned. The frontend now implements channels and company announcements; only meetings and AI remain planned. Channel creation and announcement publishing remain permission-controlled.
 
 ## Asset provenance
 

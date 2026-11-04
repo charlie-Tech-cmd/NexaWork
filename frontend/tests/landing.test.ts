@@ -1,7 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, stat } from "node:fs/promises";
-import { publicView, resetTokenFromSearch } from "../src/landing/content.ts";
+import {
+  features,
+  publicView,
+  resetTokenFromSearch,
+} from "../src/landing/content.ts";
+
+test("implemented collaboration features are listed as available, not planned", () => {
+  for (const title of ["Channels and Collaboration", "Company Announcements"]) {
+    const feature = features.find((item) => item.title === title);
+    assert.ok(feature, `${title} should appear on the landing page`);
+    assert.equal(feature.status, "Available now");
+  }
+});
 
 test("public URLs resolve to distinct onboarding, login, and protected workspace views", () => {
   assert.equal(publicView("/"), "landing");
