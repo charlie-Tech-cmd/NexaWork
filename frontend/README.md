@@ -4,7 +4,15 @@ React + TypeScript + Vite client for the existing FastAPI backend. The messaging
 
 ## Run locally
 
-Use Node 24 (or Node >=22.12). Start PostgreSQL, Redis and FastAPI using the root repository instructions. From the repository root:
+Use Node 24 (or Node >=22.12). Start PostgreSQL and Redis and configure the local database settings in the root `.env`. In a terminal at the repository root, install the backend dependencies, apply local migrations, then start FastAPI:
+
+```sh
+python -m pip install -r requirements-dev.txt
+python -m alembic upgrade head
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+In another terminal:
 
 ```sh
 cd frontend

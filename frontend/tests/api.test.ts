@@ -79,6 +79,45 @@ test("server errors conceal exception details", async () => {
     (error) => error instanceof ApiError && !error.message.includes("secret"),
   );
 });
+test("authentication service outages show a safe retry message", async () => {
+  respond(
+    {
+      detail:
+        "Authentication is temporarily unavailable. Please try again later.",
+    },
+    503,
+  );
+  await assert.rejects(
+    request("/auth/login"),
+    (error) =>
+      error instanceof ApiError &&
+      error.status === 503 &&
+      error.message ===
+        "Authentication is temporarily unavailable. Please try again later.",
+  );
+});
+test("API proxy failures show a safe service-unavailable message", async () => {
+  globalThis.fetch = async () => new Response("Bad Gateway", { status: 502 });
+  await assert.rejects(
+    request("/auth/login"),
+    (error) =>
+      error instanceof ApiError &&
+      error.status === 502 &&
+      error.message ===
+        "The workspace API could not be reached. Please try again later or contact your administrator.",
+  );
+});
+test("unrelated service errors continue to hide server details", async () => {
+  respond({ detail: "private storage key" }, 503);
+  await assert.rejects(
+    request("/attachments"),
+    (error) =>
+      error instanceof ApiError &&
+      error.status === 503 &&
+      error.message ===
+        "Your workspace could not complete this request. Please try again.",
+  );
+});
 test("network failure offers recovery", async () => {
   globalThis.fetch = async () => {
     throw new TypeError("fetch failed");

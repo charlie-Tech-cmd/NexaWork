@@ -109,13 +109,17 @@ export async function request(
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const fallback =
-      response.status === 403
-        ? "You do not have access to this action. Ask your administrator for permission."
-        : response.status === 401
-          ? "Your session has expired. Please sign in again."
-          : response.status === 429
-            ? "Too many requests. Please wait before trying again."
-            : "Your workspace could not complete this request. Please try again.";
+      response.status === 502
+        ? "The workspace API could not be reached. Please try again later or contact your administrator."
+        : response.status === 503 && path.startsWith("/auth/")
+          ? "Authentication is temporarily unavailable. Please try again later."
+          : response.status === 403
+            ? "You do not have access to this action. Ask your administrator for permission."
+            : response.status === 401
+              ? "Your session has expired. Please sign in again."
+              : response.status === 429
+                ? "Too many requests. Please wait before trying again."
+                : "Your workspace could not complete this request. Please try again.";
     throw new ApiError(
       response.status >= 500 ? fallback : detailMessage(data) || fallback,
       response.status,
