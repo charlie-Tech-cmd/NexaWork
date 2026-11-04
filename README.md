@@ -94,6 +94,21 @@ Planned capabilities include:
 
 ---
 
+## Container deployment
+
+Build the API image with `docker build -t nexawork-api .`. The container listens
+on `PORT` (default `8000`), and its health check uses `/ready`, which requires a
+reachable database; `/health` is a liveness check. Supply production settings
+through the deployment platform's secret/configuration mechanism. The image
+excludes local environment files while retaining `.env.example` for reference;
+never use that example file as production configuration.
+
+Run `python -m alembic upgrade head` as a release job against the target database
+before switching traffic to a release. Do not run migrations independently in
+every application replica.
+
+---
+
 ## Architecture
 
 NexaWork follows a modular architecture with clear separation of concerns:
