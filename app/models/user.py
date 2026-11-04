@@ -6,6 +6,7 @@ from sqlalchemy import (
     DDL,
     DateTime,
     ForeignKey,
+    Index,
     String,
     UniqueConstraint,
     event,
@@ -20,6 +21,14 @@ class User(Base):
     __tablename__ = "users"
 
     __table_args__ = (
+        Index(
+            "ix_users_org_lifecycle_approval_created",
+            "organization_id",
+            "lifecycle_managed",
+            "approval_status",
+            "created_at",
+            "id",
+        ),
         UniqueConstraint(
             "id",
             "organization_id",

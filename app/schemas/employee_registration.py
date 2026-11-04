@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import (
     BaseModel,
@@ -62,3 +63,56 @@ class RegistrationStatusResponse(BaseModel):
 
 class RegistrationCodeValidationResponse(BaseModel):
     valid: bool
+
+
+class PendingEmployeeRegistration(BaseModel):
+    user_id: int
+    full_name: str
+    email: EmailStr
+    employee_id: str
+    branch_id: int
+    branch_name: str
+    department_id: int
+    department_name: str
+    job_title: str
+    submitted_at: datetime
+    email_verified: bool
+
+
+class PendingEmployeeRegistrationPage(BaseModel):
+    items: list[PendingEmployeeRegistration]
+    total: int
+    limit: int
+    offset: int
+
+
+class RejectedEmployeeRegistration(PendingEmployeeRegistration):
+    rejected_at: datetime
+    rejected_by: str
+    rejection_reason: str | None
+
+
+class RejectedEmployeeRegistrationPage(BaseModel):
+    items: list[RejectedEmployeeRegistration]
+    total: int
+    limit: int
+    offset: int
+
+
+class RegistrationRejectionRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def blank_reason_is_empty(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class RegistrationDecisionResponse(BaseModel):
+    user_id: int
+    approval_status: Literal["approved", "rejected"]
+    is_active: bool
+    notification_status: Literal["sent", "failed"]

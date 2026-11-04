@@ -1142,7 +1142,16 @@ def test_auth_me_rejects_token_after_token_version_changes(
 def test_forgot_password_returns_generic_response_for_existing_user(
     client,
     db_session,
+    monkeypatch,
 ):
+    monkeypatch.setattr(
+        "app.api.routes.auth.is_password_recovery_ip_allowed",
+        lambda _key: True,
+    )
+    monkeypatch.setattr(
+        "app.api.routes.auth.is_password_recovery_allowed",
+        lambda _key: True,
+    )
     organization = Organization(
         name="Forgot Password Organization",
         slug="forgot-password-organization",
@@ -1173,7 +1182,18 @@ def test_forgot_password_returns_generic_response_for_existing_user(
     }
 
 
-def test_forgot_password_returns_same_response_for_unknown_email(client):
+def test_forgot_password_returns_same_response_for_unknown_email(
+    client,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "app.api.routes.auth.is_password_recovery_ip_allowed",
+        lambda _key: True,
+    )
+    monkeypatch.setattr(
+        "app.api.routes.auth.is_password_recovery_allowed",
+        lambda _key: True,
+    )
     response = client.post(
         "/api/v1/auth/forgot-password",
         json={

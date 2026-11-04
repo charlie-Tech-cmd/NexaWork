@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from typing import Literal
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, aliased
 
 from app.core.security.account_lifecycle import can_activate_account
 from app.models.audit_log import AuditLog
@@ -15,6 +15,122 @@ from app.models.user import User
 
 
 RegistrationDecision = Literal["approved", "rejected"]
+
+
+def list_pending_registrations(
+    db: Session,
+    organization_id: int,
+    limit: int,
+    offset: int,
+) -> dict[str, object]:
+    filters = (
+        User.organization_id == organization_id,
+        User.lifecycle_managed.is_(True),
+        User.approval_status == "pending",
+        Employee.organization_id == organization_id,
+    )
+    total = db.scalar(
+        select(func.count(User.id))
+        .join(Employee, Employee.user_id == User.id)
+        .where(*filters)
+    ) or 0
+    rows = db.execute(
+        select(User, Employee, Branch, Department)
+        .join(Employee, Employee.user_id == User.id)
+        .join(Branch, Branch.id == Employee.branch_id)
+        .join(Department, Department.id == Employee.department_id)
+        .where(*filters)
+        .order_by(User.created_at.desc(), User.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    items = [
+        {
+            "user_id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "employee_id": employee.employee_id,
+            "branch_id": branch.id,
+            "branch_name": branch.name,
+            "department_id": department.id,
+            "department_name": department.name,
+            "job_title": employee.job_title,
+            "submitted_at": user.created_at,
+            "email_verified": user.email_verified_at is not None,
+        }
+        for user, employee, branch, department in rows
+    ]
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+def list_rejected_registrations(
+    db: Session,
+    organization_id: int,
+    limit: int,
+    offset: int,
+) -> dict[str, object]:
+    decision_actor = aliased(User)
+    filters = (
+        User.organization_id == organization_id,
+        User.lifecycle_managed.is_(True),
+        User.approval_status == "rejected",
+        Employee.organization_id == organization_id,
+        AuditLog.organization_id == organization_id,
+        AuditLog.resource_type == "user",
+        AuditLog.resource_id == User.id,
+        AuditLog.action == "EMPLOYEE_REGISTRATION_REJECTED",
+        AuditLog.actor_organization_id == organization_id,
+    )
+    query = (
+        select(User, Employee, Branch, Department, AuditLog, decision_actor)
+        .join(Employee, Employee.user_id == User.id)
+        .join(Branch, Branch.id == Employee.branch_id)
+        .join(Department, Department.id == Employee.department_id)
+        .join(AuditLog, AuditLog.resource_id == User.id)
+        .join(decision_actor, decision_actor.id == AuditLog.user_id)
+        .where(*filters)
+    )
+    total = db.scalar(
+        select(func.count(AuditLog.id))
+        .join(User, User.id == AuditLog.resource_id)
+        .join(Employee, Employee.user_id == User.id)
+        .where(*filters)
+    ) or 0
+    rows = db.execute(
+        query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    items = [
+        {
+            "user_id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "employee_id": employee.employee_id,
+            "branch_id": branch.id,
+            "branch_name": branch.name,
+            "department_id": department.id,
+            "department_name": department.name,
+            "job_title": employee.job_title,
+            "submitted_at": user.created_at,
+            "email_verified": user.email_verified_at is not None,
+            "rejected_at": audit.created_at,
+            "rejected_by": actor.full_name,
+            "rejection_reason": audit.details,
+        }
+        for user, employee, branch, department, audit, actor in rows
+    ]
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 class LifecycleTransitionError(ValueError):
@@ -70,6 +186,7 @@ def decide_registration(
     organization_id: int,
     actor_user_id: int,
     decision: RegistrationDecision,
+    rejection_reason: str | None = None,
 ) -> User:
     if decision not in ("approved", "rejected"):
         raise LifecycleTransitionError("Invalid registration decision")
@@ -161,6 +278,11 @@ def decide_registration(
             ),
             resource_type="user",
             resource_id=user.id,
+            details=(
+                rejection_reason
+                if decision == "rejected"
+                else None
+            ),
         )
     )
 

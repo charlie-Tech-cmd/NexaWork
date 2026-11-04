@@ -1,8 +1,8 @@
 # Employee account lifecycle foundation
 
-This document describes the account-state foundation and self-registration
-backend added in Milestones 1 and 2. It does not imply that invitation or admin
-dashboard flows are available yet.
+This document describes the account-state foundation, self-registration, and
+admin approval APIs added in Milestones 1-3. It does not imply that invitation
+or dashboard UI flows are available yet.
 
 ## Separate account states
 
@@ -51,10 +51,28 @@ Milestone 2 adds these self-registration endpoints:
 - `POST /api/v1/auth/resend-verification` replaces an outstanding token while
   returning a non-enumerating response.
 
+Milestone 3 adds organization-admin approval endpoints:
+
+- `GET /api/v1/admin/employees/pending` returns paginated pending registrations,
+  including employee placement and email-verification state.
+- `POST /api/v1/admin/employees/{user_id}/approve` approves a verified
+  registration and activates its employee record.
+- `POST /api/v1/admin/employees/{user_id}/reject` rejects a pending
+  registration; an optional reason is preserved in the audit log.
+- `GET /api/v1/admin/employees/rejected` returns paginated rejected
+  registrations and their decision metadata.
+
+All approval endpoints require the existing admin authentication and
+`ADMIN_ACCESS`, and list/decision queries are scoped to the administrator's
+organization. Approval and rejection send decision emails after the database
+transaction commits. A delivery failure does not roll back the decision; the
+response reports `notification_status: "failed"` and the server logs the
+failure without recipient data.
+
 The registration-code management routes require the existing organization
 admin authentication and `ADMIN_ACCESS`. Public registration and verification
 remain separate from approval; a verified registration stays inactive and
-pending until the admin-approval milestone.
+pending until an administrator approves it.
 
 Registration codes and email verification tokens are stored as SHA-256
 digests. Codes default to a 30-day expiry (administrators may select 1–365
@@ -80,5 +98,8 @@ Migration `b52d10e7a4c9` adds registration-code and email-verification-token
 storage; its downgrade drops those records and invalidates outstanding codes
 and links.
 
-Invitations, admin approval APIs, notifications for approval outcomes, and
-dashboard/frontend integration remain future milestones.
+Migration `d649ac3f1082` adds the composite user index used by paginated
+organization approval lists; its downgrade removes only that index.
+
+Invitations, account disable/re-enable APIs, and dashboard/frontend integration
+remain future milestones.

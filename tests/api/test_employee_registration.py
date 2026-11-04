@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.security.password import hash_password
 from app.core.rate_limit import RateLimitUnavailable
+from app.services.email.service import EmailDeliveryUnavailable
 from app.models.audit_log import AuditLog
 from app.models.branch import Branch
 from app.models.department import Department
@@ -116,6 +117,44 @@ def registration_payload(code, branch_id, department_id, **overrides):
         "job_title": "Engineer",
         **overrides,
     }
+
+
+def create_pending_employee_registration(
+    db_session,
+    organization,
+    branch,
+    department,
+    *,
+    email,
+    employee_id,
+    verified,
+):
+    user = User(
+        organization_id=organization.id,
+        email=email,
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Pending Registration",
+        is_active=False,
+        lifecycle_managed=True,
+        approval_status="pending",
+        email_verified_at=(
+            datetime.now(timezone.utc) if verified else None
+        ),
+    )
+    db_session.add(user)
+    db_session.flush()
+    employee = Employee(
+        organization_id=organization.id,
+        user_id=user.id,
+        employee_id=employee_id,
+        branch_id=branch.id,
+        department_id=department.id,
+        job_title="Engineer",
+        is_active=False,
+    )
+    db_session.add(employee)
+    db_session.commit()
+    return user, employee
 
 
 def verification_token_from_email(email):
@@ -416,7 +455,7 @@ def test_registration_verification_is_separate_from_admin_approval(
         organization,
         "registration-flow.admin@example.com",
     )
-    code, _ = create_admin_registration_code(
+    code, admin_headers = create_admin_registration_code(
         client,
         db_session,
         admin,
@@ -482,24 +521,354 @@ def test_registration_verification_is_separate_from_admin_approval(
         },
     )
     assert login_response.status_code == 403
-    from app.services.account_lifecycle_service import decide_registration
-
-    approved_user = decide_registration(
-        db_session,
-        user_id=user.id,
-        organization_id=organization.id,
-        actor_user_id=admin.id,
-        decision="approved",
+    approval_response = client.post(
+        f"/api/v1/admin/employees/{user.id}/approve",
+        headers=admin_headers,
     )
+    assert approval_response.status_code == 200
+    assert approval_response.json() == {
+        "user_id": user.id,
+        "approval_status": "approved",
+        "is_active": True,
+        "notification_status": "sent",
+    }
+    db_session.refresh(user)
     db_session.refresh(employee)
-    assert approved_user.is_active is True
+    assert user.is_active is True
     assert employee.is_active is True
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+    assert login_response.status_code == 200
+    assert email_service.sent_emails[-1]["subject"] == (
+        "Your NexaWork registration was approved"
+    )
 
     replay_response = client.post(
         "/api/v1/auth/verify-email",
         json={"token": token},
     )
     assert replay_response.status_code == 400
+
+
+def test_admin_pending_list_is_paginated_and_organization_scoped(
+    client,
+    db_session,
+):
+    organization, branch, department = create_registration_workspace(
+        db_session,
+        "approval-list-org",
+    )
+    admin = create_org_admin(
+        db_session,
+        organization,
+        "approval-list.admin@example.com",
+    )
+    _, admin_headers = create_admin_registration_code(
+        client,
+        db_session,
+        admin,
+    )
+    other_organization, other_branch, other_department = (
+        create_registration_workspace(
+            db_session,
+            "approval-list-other-org",
+        )
+    )
+    other_admin = create_org_admin(
+        db_session,
+        other_organization,
+        "approval-list-other.admin@example.com",
+    )
+    _, other_admin_headers = create_admin_registration_code(
+        client,
+        db_session,
+        other_admin,
+    )
+    registrations = [
+        create_pending_employee_registration(
+            db_session,
+            organization,
+            branch,
+            department,
+            email=f"approval-list-{index}@example.com",
+            employee_id=f"APP-LIST-{index}",
+            verified=index != 1,
+        )
+        for index in range(3)
+    ]
+    create_pending_employee_registration(
+        db_session,
+        other_organization,
+        other_branch,
+        other_department,
+        email="approval-list-other@example.com",
+        employee_id="APP-LIST-OTHER",
+        verified=True,
+    )
+
+    first_page = client.get(
+        "/api/v1/admin/employees/pending?limit=1&offset=0",
+        headers=admin_headers,
+    )
+    assert first_page.status_code == 200
+    assert first_page.json()["total"] == 3
+    assert len(first_page.json()["items"]) == 1
+    assert first_page.json()["items"][0]["email_verified"] is True
+
+    second_page = client.get(
+        "/api/v1/admin/employees/pending?limit=1&offset=1",
+        headers=admin_headers,
+    )
+    assert second_page.status_code == 200
+    assert len(second_page.json()["items"]) == 1
+    listed = client.get(
+        "/api/v1/admin/employees/pending",
+        headers=admin_headers,
+    )
+    assert listed.status_code == 200
+    listed_emails = {item["email"] for item in listed.json()["items"]}
+    assert listed_emails == {
+        "approval-list-0@example.com",
+        "approval-list-1@example.com",
+        "approval-list-2@example.com",
+    }
+    assert (
+        client.get(
+            "/api/v1/admin/employees/pending",
+            headers=other_admin_headers,
+        ).json()["total"]
+        == 1
+    )
+    assert registrations[1][0].email in listed_emails
+
+
+def test_admin_rejects_registration_and_rejected_list_preserves_reason(
+    client,
+    db_session,
+    email_service,
+):
+    organization, branch, department = create_registration_workspace(
+        db_session,
+        "approval-reject-org",
+    )
+    admin = create_org_admin(
+        db_session,
+        organization,
+        "approval-reject.admin@example.com",
+    )
+    _, admin_headers = create_admin_registration_code(
+        client,
+        db_session,
+        admin,
+    )
+    user, _ = create_pending_employee_registration(
+        db_session,
+        organization,
+        branch,
+        department,
+        email="approval-reject@example.com",
+        employee_id="APP-REJECT-001",
+        verified=False,
+    )
+
+    response = client.post(
+        f"/api/v1/admin/employees/{user.id}/reject",
+        json={"reason": "Employment details could not be verified."},
+        headers=admin_headers,
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "user_id": user.id,
+        "approval_status": "rejected",
+        "is_active": False,
+        "notification_status": "sent",
+    }
+    db_session.refresh(user)
+    assert user.is_active is False
+    assert user.approval_status == "rejected"
+
+    audit = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "EMPLOYEE_REGISTRATION_REJECTED",
+            AuditLog.resource_id == user.id,
+        )
+    )
+    assert audit is not None
+    assert audit.user_id == admin.id
+    assert audit.details == "Employment details could not be verified."
+
+    rejected_response = client.get(
+        "/api/v1/admin/employees/rejected",
+        headers=admin_headers,
+    )
+    assert rejected_response.status_code == 200
+    assert rejected_response.json()["total"] == 1
+    assert rejected_response.json()["items"][0]["rejection_reason"] == (
+        "Employment details could not be verified."
+    )
+    assert rejected_response.json()["items"][0]["rejected_by"] == (
+        "Organization Administrator"
+    )
+    assert email_service.sent_emails[-1]["subject"] == (
+        "Your NexaWork registration update"
+    )
+    assert (
+        "Employment details could not be verified."
+        in email_service.sent_emails[-1]["body"]
+    )
+    assert client.post(
+        f"/api/v1/admin/employees/{user.id}/reject",
+        headers=admin_headers,
+    ).status_code == 409
+
+
+def test_admin_cannot_approve_unverified_or_cross_organization_registration(
+    client,
+    db_session,
+):
+    organization, branch, department = create_registration_workspace(
+        db_session,
+        "approval-scope-org",
+    )
+    admin = create_org_admin(
+        db_session,
+        organization,
+        "approval-scope.admin@example.com",
+    )
+    _, admin_headers = create_admin_registration_code(
+        client,
+        db_session,
+        admin,
+    )
+    user, _ = create_pending_employee_registration(
+        db_session,
+        organization,
+        branch,
+        department,
+        email="approval-scope@example.com",
+        employee_id="APP-SCOPE-001",
+        verified=False,
+    )
+    other_organization, other_branch, other_department = (
+        create_registration_workspace(
+            db_session,
+            "approval-scope-other-org",
+        )
+    )
+    other_user, _ = create_pending_employee_registration(
+        db_session,
+        other_organization,
+        other_branch,
+        other_department,
+        email="approval-scope-other@example.com",
+        employee_id="APP-SCOPE-OTHER",
+        verified=True,
+    )
+
+    unverified_response = client.post(
+        f"/api/v1/admin/employees/{user.id}/approve",
+        headers=admin_headers,
+    )
+    assert unverified_response.status_code == 409
+    cross_organization_response = client.post(
+        f"/api/v1/admin/employees/{other_user.id}/approve",
+        headers=admin_headers,
+    )
+    assert cross_organization_response.status_code == 404
+
+
+def test_approval_is_committed_when_decision_email_delivery_fails(
+    client,
+    db_session,
+    email_service,
+    monkeypatch,
+):
+    organization, branch, department = create_registration_workspace(
+        db_session,
+        "approval-email-failure-org",
+    )
+    admin = create_org_admin(
+        db_session,
+        organization,
+        "approval-email-failure.admin@example.com",
+    )
+    _, admin_headers = create_admin_registration_code(
+        client,
+        db_session,
+        admin,
+    )
+    user, _ = create_pending_employee_registration(
+        db_session,
+        organization,
+        branch,
+        department,
+        email="approval-email-failure@example.com",
+        employee_id="APP-EMAIL-FAILURE",
+        verified=True,
+    )
+
+    def fail_delivery(**_message):
+        raise EmailDeliveryUnavailable("delivery unavailable")
+
+    monkeypatch.setattr(email_service, "send", fail_delivery)
+    response = client.post(
+        f"/api/v1/admin/employees/{user.id}/approve",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["approval_status"] == "approved"
+    assert response.json()["notification_status"] == "failed"
+    db_session.refresh(user)
+    assert user.is_active is True
+
+
+def test_non_admin_cannot_list_or_decide_registrations(client, db_session):
+    organization, branch, department = create_registration_workspace(
+        db_session,
+        "approval-forbidden-org",
+    )
+    user = User(
+        organization_id=organization.id,
+        email="approval-forbidden.member@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Organization Member",
+    )
+    db_session.add(user)
+    db_session.commit()
+    pending_user, _ = create_pending_employee_registration(
+        db_session,
+        organization,
+        branch,
+        department,
+        email="approval-forbidden@example.com",
+        employee_id="APP-FORBIDDEN-001",
+        verified=True,
+    )
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+    headers = {
+        "Authorization": f"Bearer {login_response.json()['access_token']}",
+    }
+
+    assert client.get(
+        "/api/v1/admin/employees/pending",
+        headers=headers,
+    ).status_code == 403
+    assert client.post(
+        f"/api/v1/admin/employees/{pending_user.id}/approve",
+        headers=headers,
+    ).status_code == 403
 
 
 def test_registration_rejects_invalid_code_and_cross_org_placement(
