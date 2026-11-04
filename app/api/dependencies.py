@@ -209,7 +209,20 @@ def require_permission(permission_name: str):
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db),
     ) -> User:
-        permission_exists = db.scalar(
+        if not has_permission(db, current_user, permission_name):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied",
+            )
+
+        return current_user
+
+    return permission_dependency
+
+
+def has_permission(db: Session, current_user: User, permission_name: str) -> bool:
+    return (
+        db.scalar(
             select(Permission.id)
             .join(
                 role_permissions,
@@ -219,10 +232,7 @@ def require_permission(permission_name: str):
                 user_roles,
                 user_roles.c.role_id == role_permissions.c.role_id,
             )
-            .join(
-                Role,
-                Role.id == user_roles.c.role_id,
-            )
+            .join(Role, Role.id == user_roles.c.role_id)
             .where(
                 user_roles.c.user_id == current_user.id,
                 Permission.name == permission_name,
@@ -231,16 +241,8 @@ def require_permission(permission_name: str):
                 Role.organization_id == current_user.organization_id,
             )
         )
-
-        if permission_exists is None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Permission denied",
-            )
-
-        return current_user
-
-    return permission_dependency
+        is not None
+    )
 
 
 def require_any_permission(*permission_names: str):

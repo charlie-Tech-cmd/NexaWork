@@ -12,6 +12,7 @@ from app.models.user_role import user_roles
 from app.models.user import User
 from app.models.conversation import Conversation
 from app.models.conversation_member import ConversationMember
+from app.models.announcement import Announcement
 from app.models.message import Message
 from app.models.team import Team
 from app.models.password_reset_token import PasswordResetToken
@@ -22,6 +23,7 @@ __all__ = [
     "Message",
     "ConversationMember",
     "Conversation",
+    "Announcement",
     "Base",
     "Branch",
     "Department",

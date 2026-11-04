@@ -741,6 +741,8 @@ def test_organization_onboarding_grants_organization_update_permission(
             Permission(name="ROLE_ASSIGN_PERMISSION", description="Assign permissions to roles", is_active=True),
             Permission(name="ROLE_REMOVE_PERMISSION", description="Remove permissions from roles", is_active=True),
             Permission(name="ADMIN_ACCESS", description="Access administrative functions", is_active=True),
+            Permission(name="CHANNEL_CREATE", description="Create workplace channels", is_active=True),
+            Permission(name="ANNOUNCEMENT_CREATE", description="Publish organization announcements", is_active=True),
         ]
     )
     db_session.commit()
@@ -813,6 +815,8 @@ def test_organization_onboarding_grants_organization_update_permission(
         "ROLE_ASSIGN_PERMISSION",
         "ROLE_REMOVE_PERMISSION",
         "ADMIN_ACCESS",
+        "CHANNEL_CREATE",
+        "ANNOUNCEMENT_CREATE",
     }
     granted_permissions = set(
         db_session.scalars(
@@ -867,6 +871,8 @@ def test_organization_onboarding_rolls_back_when_required_permission_is_inactive
         "ROLE_ASSIGN_PERMISSION",
         "ROLE_REMOVE_PERMISSION",
         "ADMIN_ACCESS",
+        "CHANNEL_CREATE",
+        "ANNOUNCEMENT_CREATE",
     ]
     db_session.add_all(
         [

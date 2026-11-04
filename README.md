@@ -94,6 +94,21 @@ Planned capabilities include:
 
 ---
 
+## Container deployment
+
+Build the API image with `docker build -t nexawork-api .`. The container listens
+on `PORT` (default `8000`), and its health check uses `/ready`, which requires a
+reachable database; `/health` is a liveness check. Supply production settings
+through the deployment platform's secret/configuration mechanism. The image
+excludes local environment files while retaining `.env.example` for reference;
+never use that example file as production configuration.
+
+Run `python -m alembic upgrade head` as a release job against the target database
+before switching traffic to a release. Do not run migrations independently in
+every application replica.
+
+---
+
 ## Architecture
 
 NexaWork follows a modular architecture with clear separation of concerns:
@@ -183,10 +198,11 @@ NexaWork is being developed incrementally.
 
 * Direct messaging
 * Group messaging
-* Channels
+* Public/private collaboration channels and channel messaging (initial slice implemented)
+* Organization-wide announcements (initial slice implemented)
 * WebSockets
 * Presence
-* Notifications
+* Channel notifications and search
 
 ### Phase 3 — Meetings
 
@@ -259,6 +275,8 @@ Completed foundation work includes:
 * Authenticated user profile endpoint
 
 The next major foundation work is focused on **organizations, multi-tenancy, employees, administrators, roles, and permissions**.
+
+An initial collaboration slice is also implemented: public/private channels reuse the existing message and configured attachment flows, and organization-wide announcements use an organization role permission. Channel search/notifications, real-time delivery, meetings, and the AI workplace assistant remain planned.
 
 ---
 

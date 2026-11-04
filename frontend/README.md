@@ -26,13 +26,15 @@ Sign in as a member, organization administrator, or with an employee ID. New org
 - Role listing, creation and inspection of assigned permissions.
 - Organization name/handle updates.
 - Direct/group conversations, paged history, per-member seen status, replies that link back to and highlight the original message, private file attachments and a conversation-scoped Files view. Seen status updates while the conversation is open; delivery remains poll-based, not real-time. The Files navigation and conversation tab follow the authenticated backend policy; the upload picker also requires scanner configuration and a private writable storage directory. See [setup and release gates](../docs/MESSAGING_FILES_SETUP.md).
+- Public and private collaboration channels with public joining, moderator-managed private invitations and membership, channel messages/replies, and the existing file-sharing policy.
+- Organization-wide company announcements. Active organization members can read the feed; publishing is controlled by the `ANNOUNCEMENT_CREATE` organization role permission.
 - Loading, empty, validation, permission-denied, network failure, retry and session-expiry states.
 
-This first frontend does not include employee-record administration, role/permission assignment, account deactivation, super-admin operations, hierarchy editing, websocket delivery, or presence. These remain explicit follow-on workflows, not inactive controls pretending to work. The broken admin dashboard aggregate endpoint is not used.
+Channel search, channel notifications and real-time delivery are not included yet. Audio/video meetings and the AI workplace assistant remain planned. This frontend also does not include employee-record administration, role/permission assignment, account deactivation, super-admin operations, hierarchy editing, or presence. These remain explicit follow-on workflows, not inactive controls pretending to work. The broken admin dashboard aggregate endpoint is not used.
 
 ## Security and integration
 
-Authorization remains enforced by FastAPI. The API has no current-user capability endpoint, so controls may be visible to users who lack a permission; a denied request displays the backend's error. Administrator sign-in uses its separate endpoint. UI mode does not grant access.
+Authorization remains enforced by FastAPI. Channel creation and announcement publishing follow backend-reported capabilities and server-side role permissions; channel membership and message access are checked by the API. Administrator sign-in uses its separate endpoint. UI mode does not grant access.
 
 Bearer tokens exist only in React memory, never localStorage, sessionStorage, URLs or logs. Requests omit cookies, reject redirects and time out after 20 seconds. Navigating away cancels list requests. Changed resource identifiers hide old records before new results arrive. Mutations are not automatically retried. There are no remote fonts, analytics or third-party assets. Text is escaped by React.
 
@@ -67,10 +69,12 @@ Office photos are self-hosted in `public/images` with responsive sources, lazy
 loading below the fold, alt text and an image-error fallback. Attribution and
 license sources are recorded in `../.interface-forge/LANDING-DESIGN.md`.
 The landing page highlights implemented direct/group messaging and private file
-sharing, with file availability explicitly conditional on workspace enablement.
-Channels, announcements, meetings and AI remain marked Planned. Illustrative
-interface previews are labeled as sample content, not live screenshots. It makes
-no customer, metric, legal page or public-contact claims.
+sharing, channels and company announcements. File availability is explicitly
+conditional on workspace enablement; channel creation and announcement
+publishing follow organization role permissions. Meetings and the AI workplace
+assistant remain marked Planned. Illustrative interface previews are labeled
+as sample content, not live screenshots. It makes no customer, metric, legal
+page or public-contact claims.
 
 ## Brand system
 

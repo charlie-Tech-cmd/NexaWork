@@ -69,8 +69,9 @@ class ConversationResponse(BaseModel):
 
     id: int
     organization_id: int
-    conversation_type: Literal["direct", "group"]
+    conversation_type: Literal["direct", "group", "channel"]
     name: str | None
+    channel_visibility: Literal["public", "private"] | None = None
     created_by_user_id: int
     created_at: datetime
 

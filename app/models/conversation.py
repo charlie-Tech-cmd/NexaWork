@@ -9,6 +9,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -53,6 +54,7 @@ class Conversation(Base):
                 AND direct_user_high_id IS NOT NULL
                 AND direct_user_low_id < direct_user_high_id
                 AND name IS NULL
+                AND channel_visibility IS NULL
             )
             OR
             (
@@ -61,9 +63,27 @@ class Conversation(Base):
                 AND direct_user_high_id IS NULL
                 AND name IS NOT NULL
                 AND length(trim(name)) > 0
+                AND channel_visibility IS NULL
+            )
+            OR
+            (
+                conversation_type = 'channel'
+                AND direct_user_low_id IS NULL
+                AND direct_user_high_id IS NULL
+                AND name IS NOT NULL
+                AND length(trim(name)) > 0
+                AND channel_visibility IN ('public', 'private')
             )
             """,
             name="ck_conversations_type_and_participants",
+        ),
+        Index(
+            "uq_conversations_channel_name",
+            "organization_id",
+            text("lower(name)"),
+            unique=True,
+            postgresql_where=text("conversation_type = 'channel'"),
+            sqlite_where=text("conversation_type = 'channel'"),
         ),
         Index(
             "ix_conversations_organization_created",
@@ -86,6 +106,11 @@ class Conversation(Base):
 
     name: Mapped[str | None] = mapped_column(
         String(255),
+        nullable=True,
+    )
+
+    channel_visibility: Mapped[str | None] = mapped_column(
+        String(10),
         nullable=True,
     )
 

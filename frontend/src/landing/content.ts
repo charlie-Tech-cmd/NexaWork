@@ -17,14 +17,16 @@ export const features = [
   {
     icon: "channels",
     title: "Channels and Collaboration",
-    description: "Keep project and department discussions organized.",
-    status: "Planned",
+    description:
+      "Create public or private spaces, join public discussions, and share channel messages and replies.",
+    status: "Available now",
   },
   {
     icon: "announcement",
     title: "Company Announcements",
-    description: "Share important updates across the organization.",
-    status: "Planned",
+    description:
+      "Read organization-wide updates. Members with publishing permission can share announcements.",
+    status: "Available now",
   },
   {
     icon: "video",
@@ -84,8 +86,8 @@ export const dayScenes = [
   {
     title: "Keep everyone in the loop.",
     description:
-      "The vision: managers share company updates in one place, so every department has the same context.",
-    status: "Planned",
+      "Read important updates from your organization in one place. Members with publishing permission can share announcements.",
+    status: "Available now",
     icon: "announcement",
     label: "Company update",
     rows: [
