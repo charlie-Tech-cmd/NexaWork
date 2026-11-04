@@ -10,6 +10,7 @@ from sqlalchemy.engine import URL
 class Settings(BaseSettings):
     app_name: str = "NexaWork"
     environment: str = "development"
+    email_provider: Literal["fake", "unconfigured"] = "fake"
     cors_origins: str = "http://localhost:3000"
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
     redis_url: str = "redis://localhost:6379/0"
@@ -62,6 +63,13 @@ class Settings(BaseSettings):
 
     password_reset_token_expire_minutes: int = Field(default=30, gt=0)
     password_reset_url: str = "http://localhost:3000/reset-password"
+    email_verification_token_expire_minutes: int = Field(
+        default=1440,
+        gt=0,
+    )
+    email_verification_url: str = (
+        "http://localhost:3000/verify-email"
+    )
 
     db_host: str = "localhost"
     db_port: int = 5432
@@ -82,15 +90,26 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self):
+        errors = []
+        if (
+            self.environment.strip().lower() not in {"development", "test"}
+            and self.email_provider == "fake"
+        ):
+            errors.append(
+                "EMAIL_PROVIDER=fake is allowed only in development/test"
+            )
         if self.allow_unscanned_development_files and self.environment.strip().lower() not in {
             "development",
             "test",
         }:
-            raise ValueError("Unscanned file bypass is only allowed in development/test")
+            errors.append(
+                "Unscanned file bypass is only allowed in development/test"
+            )
         if self.environment.strip().lower() != "production":
+            if errors:
+                raise ValueError("; ".join(errors))
             return self
 
-        errors = []
         if self.allow_unscanned_development_files:
             errors.append("Unscanned file bypass is forbidden in production")
         if self.attachments_enabled and (
@@ -152,6 +171,27 @@ class Settings(BaseSettings):
         if not reset_url_valid:
             errors.append(
                 "PASSWORD_RESET_URL must be an absolute HTTPS URL "
+                "without credentials or fragments in production"
+            )
+
+        try:
+            parsed_verification_url = urlsplit(
+                self.email_verification_url.strip()
+            )
+            verification_url_valid = (
+                parsed_verification_url.scheme.lower() == "https"
+                and bool(parsed_verification_url.hostname)
+                and parsed_verification_url.username is None
+                and parsed_verification_url.password is None
+                and not parsed_verification_url.fragment
+            )
+            parsed_verification_url.port
+        except ValueError:
+            verification_url_valid = False
+
+        if not verification_url_valid:
+            errors.append(
+                "EMAIL_VERIFICATION_URL must be an absolute HTTPS URL "
                 "without credentials or fragments in production"
             )
 

@@ -16,6 +16,10 @@ from app.models.announcement import Announcement
 from app.models.message import Message
 from app.models.team import Team
 from app.models.password_reset_token import PasswordResetToken
+from app.models.email_verification_token import EmailVerificationToken
+from app.models.organization_registration_code import (
+    OrganizationRegistrationCode,
+)
 
 
 
@@ -35,5 +39,7 @@ __all__ = [
     "User",
     "Team",
     "PasswordResetToken",
+    "EmailVerificationToken",
+    "OrganizationRegistrationCode",
 ]
 from app.models.attachment import Attachment

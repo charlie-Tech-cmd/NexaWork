@@ -6,6 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.core.security.account_lifecycle import can_activate_account
 from app.models.audit_log import AuditLog
+from app.models.branch import Branch
+from app.models.department import Department
+from app.models.email_verification_token import EmailVerificationToken
+from app.models.employee import Employee
+from app.models.region import Region
 from app.models.user import User
 
 
@@ -98,9 +103,52 @@ def decide_registration(
     if actor is None:
         raise LifecycleTransitionError("Approver not found in organization")
 
+    employee = db.scalar(
+        select(Employee)
+        .where(
+            Employee.user_id == user.id,
+            Employee.organization_id == organization_id,
+        )
+        .with_for_update()
+    )
+    if decision == "approved" and employee is not None:
+        active_placement = db.scalar(
+            select(Employee.id)
+            .join(Branch, Branch.id == Employee.branch_id)
+            .join(Region, Region.id == Branch.region_id)
+            .join(
+                Department,
+                Department.id == Employee.department_id,
+            )
+            .where(
+                Employee.id == employee.id,
+                Employee.organization_id == organization_id,
+                Branch.organization_id == organization_id,
+                Branch.is_active.is_(True),
+                Region.organization_id == organization_id,
+                Region.is_active.is_(True),
+                Department.branch_id == Branch.id,
+                Department.is_active.is_(True),
+            )
+        )
+        if active_placement is None:
+            raise LifecycleTransitionError(
+                "Employee placement is inactive or unavailable"
+            )
+        employee.is_active = True
+    elif employee is not None:
+        employee.is_active = False
+
     user.approval_status = decision
     user.is_active = decision == "approved" and can_activate_account(user)
     user.token_version += 1
+    db.query(EmailVerificationToken).filter(
+        EmailVerificationToken.user_id == user.id,
+        EmailVerificationToken.used_at.is_(None),
+    ).update(
+        {EmailVerificationToken.used_at: datetime.now(timezone.utc)},
+        synchronize_session="fetch",
+    )
     db.add(
         AuditLog(
             organization_id=organization_id,

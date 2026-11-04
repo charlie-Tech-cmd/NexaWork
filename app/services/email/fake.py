@@ -5,6 +5,9 @@ class FakeEmailService(EmailService):
     def __init__(self) -> None:
         self.sent_emails: list[dict[str, str]] = []
 
+    def ensure_available(self) -> None:
+        return None
+
     def send(
         self,
         *,

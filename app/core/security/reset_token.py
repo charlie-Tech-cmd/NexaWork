@@ -1,10 +1,12 @@
-import hashlib
-import secrets
+from app.core.security.one_time_token import (
+    generate_secure_token,
+    hash_token,
+)
 
 
 def generate_reset_token() -> str:
-    return secrets.token_urlsafe(32)
+    return generate_secure_token()
 
 
 def hash_reset_token(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return hash_token(token)

@@ -25,6 +25,8 @@ def production(**changes):
         db_host="db.example.invalid",
         db_password="test-only-password",
         password_reset_url="https://app.example.invalid/reset",
+        email_provider="unconfigured",
+        email_verification_url="https://app.example.invalid/verify-email",
         cors_origins="https://app.example.invalid",
         allowed_hosts="api.example.invalid",
     )

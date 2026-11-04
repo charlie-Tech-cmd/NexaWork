@@ -7,10 +7,12 @@ from app.core.config import Settings
 def make_production_settings(**overrides):
     values = {
         "environment": "production",
+        "email_provider": "unconfigured",
         "jwt_secret_key": "test-production-secret-with-enough-length",
         "db_host": "db.example.com",
         "db_password": "a-strong-database-password",
         "password_reset_url": "https://app.example.com/reset-password",
+        "email_verification_url": "https://app.example.com/verify-email",
         "cors_origins": "https://app.example.com",
         "allowed_hosts": "app.example.com",
     }
@@ -24,6 +26,7 @@ def test_valid_production_settings_are_accepted():
 
     assert settings.environment == "production"
     assert settings.cors_origin_list == ["https://app.example.com"]
+    assert settings.email_provider == "unconfigured"
 
 
 def test_production_attachment_storage_root_must_be_absolute():
@@ -60,6 +63,11 @@ def test_unsafe_production_settings_are_rejected(override, message):
         make_production_settings(**override)
 
 
+def test_fake_email_provider_is_rejected_outside_development_and_test():
+    with pytest.raises(ValidationError, match="EMAIL_PROVIDER"):
+        make_production_settings(email_provider="fake")
+
+
 @pytest.mark.parametrize(
     "setting",
     [
@@ -80,6 +88,7 @@ def test_non_positive_rate_limit_settings_are_rejected(setting, value):
     [
         "jwt_access_token_expire_minutes",
         "password_reset_token_expire_minutes",
+        "email_verification_token_expire_minutes",
     ],
 )
 @pytest.mark.parametrize("value", [0, -1])
@@ -122,6 +131,24 @@ def test_invalid_production_password_reset_urls_are_rejected(
 ):
     with pytest.raises(ValidationError):
         make_production_settings(password_reset_url=password_reset_url)
+
+
+@pytest.mark.parametrize(
+    "email_verification_url",
+    [
+        "https://",
+        "https:///verify-email",
+        "https://user:pass@app.example.com/verify-email",
+        "https://app.example.com/verify-email#fragment",
+    ],
+)
+def test_invalid_production_verification_urls_are_rejected(
+    email_verification_url,
+):
+    with pytest.raises(ValidationError):
+        make_production_settings(
+            email_verification_url=email_verification_url,
+        )
 
 
 def test_allowed_hosts_are_parsed():

@@ -7,6 +7,7 @@ from app.api.dependencies import (
     get_current_organization,
     get_current_super_admin,
     get_current_user,
+    require_admin_access,
     require_permission,
 )
 
@@ -21,6 +22,14 @@ from app.schemas.organization import (
     OrganizationResponse,
     OrganizationStatusUpdate,
     OrganizationUpdate,
+)
+from app.schemas.employee_registration import (
+    RegistrationCodeCreate,
+    RegistrationCodeResponse,
+)
+from app.services.employee_registration_service import (
+    create_registration_code,
+    revoke_registration_codes,
 )
 from app.services.organization_service import (
     create_organization as create_organization_service,
@@ -161,6 +170,58 @@ async def update_my_organization(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Organization slug already exists",
+        )
+
+
+@router.post(
+    "/me/registration-code",
+    response_model=RegistrationCodeResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def rotate_my_registration_code(
+    payload: RegistrationCodeCreate,
+    current_admin: User = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    if current_admin.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization administrator required",
+        )
+    raw_code, registration_code = create_registration_code(
+        db=db,
+        organization_id=current_admin.organization_id,
+        actor_user_id=current_admin.id,
+        expires_in_days=payload.expires_in_days,
+    )
+    return {
+        "code": raw_code,
+        "expires_at": registration_code.expires_at,
+    }
+
+
+@router.delete(
+    "/me/registration-code",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def revoke_my_registration_code(
+    current_admin: User = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    if current_admin.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization administrator required",
+        )
+    revoked = revoke_registration_codes(
+        db=db,
+        organization_id=current_admin.organization_id,
+        actor_user_id=current_admin.id,
+    )
+    if not revoked:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active registration code",
         )
 
 

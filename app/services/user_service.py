@@ -153,9 +153,9 @@ def update_user(
         raise ValueError("User not found")
 
     email_changed = email is not None and email != user.email
-    if is_active is True and user.lifecycle_managed and email_changed:
+    if user.lifecycle_managed and email_changed:
         raise LifecycleTransitionError(
-            "Email changes require reverification before activation"
+            "Email cannot be changed for a lifecycle-managed account"
         )
     if is_active is True and not can_activate_account(user):
         raise LifecycleTransitionError(
@@ -174,10 +174,6 @@ def update_user(
             raise ValueError("Email already registered")
 
         user.email = email
-        if email_changed and user.lifecycle_managed:
-            user.email_verified_at = None
-            user.is_active = False
-            user.token_version += 1
 
     if full_name is not None:
         user.full_name = full_name

@@ -64,8 +64,20 @@ def client(db_session: Session, email_service: FakeEmailService):
                     "app.api.routes.organizations.is_organization_onboarding_ip_allowed",
                     return_value=True,
                 ):
-                    with TestClient(app) as test_client:
-                        yield test_client
+                    with patch(
+                        "app.api.routes.auth.is_registration_ip_allowed",
+                        return_value=True,
+                    ):
+                        with patch(
+                            "app.api.routes.auth.is_registration_code_allowed",
+                            return_value=True,
+                        ):
+                            with patch(
+                                "app.api.routes.auth.is_registration_identity_allowed",
+                                return_value=True,
+                            ):
+                                with TestClient(app) as test_client:
+                                    yield test_client
     finally:
         app.dependency_overrides.clear()
 

@@ -1,8 +1,8 @@
 # Employee account lifecycle foundation
 
-This document describes the account-state foundation added in Milestone 1. It
-does not imply that self-registration, invitation, or admin dashboard flows are
-available yet.
+This document describes the account-state foundation and self-registration
+backend added in Milestones 1 and 2. It does not imply that invitation or admin
+dashboard flows are available yet.
 
 ## Separate account states
 
@@ -35,12 +35,39 @@ it is not a substitute for disabling the linked user account.
 - Enabling a lifecycle-managed account requires approved status and verified
   email. Changes to account activation increment `token_version`, so tokens
   issued before disable/re-enable remain invalid.
-- Changing the email of a lifecycle-managed account clears verification,
-  disables the account, and increments `token_version`.
+- Email changes for lifecycle-managed accounts are rejected until a dedicated
+  reverification flow is available.
 
-The state-transition services are not exposed as new public API endpoints in
-this milestone. Future routes must also enforce the existing RBAC permissions
-and tenant authorization.
+Milestone 2 adds these self-registration endpoints:
+
+- `POST /api/v1/organizations/me/registration-code` creates or rotates an
+  organization code. The plaintext value is returned only at creation.
+- `DELETE /api/v1/organizations/me/registration-code` revokes the active code.
+- `POST /api/v1/auth/registration-code/validate` returns only `valid: true` or
+  `valid: false`; it never returns organization details.
+- `POST /api/v1/auth/register` creates a pending, inactive user and employee
+  after validating the code and same-organization branch/department placement.
+- `POST /api/v1/auth/verify-email` consumes a one-time verification token.
+- `POST /api/v1/auth/resend-verification` replaces an outstanding token while
+  returning a non-enumerating response.
+
+The registration-code management routes require the existing organization
+admin authentication and `ADMIN_ACCESS`. Public registration and verification
+remain separate from approval; a verified registration stays inactive and
+pending until the admin-approval milestone.
+
+Registration codes and email verification tokens are stored as SHA-256
+digests. Codes default to a 30-day expiry (administrators may select 1–365
+days or no expiry), and verification tokens expire after the configured
+`EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES`. Registration, code validation, and
+verification resend use IP and/or hashed identity/code rate limits.
+
+`EMAIL_PROVIDER=fake` is allowed only in development/test and stores messages
+in process memory. Other environments use `EMAIL_PROVIDER=unconfigured`;
+registration and password recovery return 503 before processing until a real
+email provider is configured. A configured provider's transient verification
+send failures are logged without recipient/token data; the registration
+remains pending and can request a replacement token.
 
 ## Migration and rollback
 
@@ -49,6 +76,9 @@ drops those fields and therefore loses lifecycle state. Do not downgrade after
 lifecycle-managed accounts have been created unless their state has been
 preserved through an approved recovery plan.
 
-Email verification tokens, registration codes, invitation records, public
-registration, approval endpoints, notifications, and dashboard integration
-remain future milestones.
+Migration `b52d10e7a4c9` adds registration-code and email-verification-token
+storage; its downgrade drops those records and invalidates outstanding codes
+and links.
+
+Invitations, admin approval APIs, notifications for approval outcomes, and
+dashboard/frontend integration remain future milestones.

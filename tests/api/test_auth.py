@@ -1618,7 +1618,7 @@ def test_forgot_password_email_token_can_reset_password(
         redis_client.delete(reset_key)
 
 
-def test_public_registration_endpoint_is_removed(client):
+def test_registration_requires_complete_onboarding_information(client):
     response = client.post(
         "/api/v1/auth/register",
         json={
@@ -1629,7 +1629,7 @@ def test_public_registration_endpoint_is_removed(client):
         },
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 422
 
 
 def test_reset_password_is_rate_limited(client):

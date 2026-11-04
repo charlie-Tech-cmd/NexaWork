@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -7,12 +9,17 @@ from app.api.dependencies import get_current_user
 from app.core.security.account_lifecycle import can_authenticate_user
 from app.core.security.password import hash_password, verify_password
 from app.core.security.jwt import create_access_token
+from app.core.security.one_time_token import hash_token
 from app.core.rate_limit import (
     is_login_allowed,
     is_login_ip_allowed,
     is_password_recovery_allowed,
     is_password_recovery_ip_allowed,
     is_password_reset_allowed,
+    is_registration_code_allowed,
+    is_registration_identity_allowed,
+    is_registration_ip_allowed,
+    RateLimitUnavailable,
 )
 from app.db.session import get_db
 from app.models.employee import Employee
@@ -23,6 +30,23 @@ from app.models.role_permission import role_permissions
 from app.models.user import User
 from app.models.user_role import user_roles
 from app.schemas.employee import EmployeeLogin
+from app.schemas.employee_registration import (
+    EmailVerificationRequest,
+    EmployeeRegistrationCreate,
+    RegistrationCodeValidate,
+    RegistrationCodeValidationResponse,
+    RegistrationStatusResponse,
+    ResendVerificationRequest,
+)
+from app.services.account_lifecycle_service import LifecycleTransitionError
+from app.services.email.service import EmailDeliveryUnavailable
+from app.services.employee_registration_service import (
+    create_employee_registration,
+    registration_code_is_valid,
+    resend_registration_verification,
+    send_employee_verification_email,
+    verify_registration_email,
+)
 from app.services.password_reset_service import reset_password
 from app.schemas.user import (
     AdminLogin,
@@ -39,6 +63,202 @@ from app.services.password_recovery_service import (
 
 
 router = APIRouter(prefix="/api/v1")
+logger = logging.getLogger(__name__)
+REGISTRATION_RESPONSE_MESSAGE = (
+    "If the information is eligible, your registration request was received."
+)
+
+
+def _client_host(request: Request) -> str:
+    return request.client.host if request.client is not None else "unknown"
+
+
+def _enforce_registration_ip_limit(request: Request) -> None:
+    try:
+        if not is_registration_ip_allowed(
+            f"registration-ip:{_client_host(request)}"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many registration attempts. Please try again later.",
+            )
+    except RateLimitUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration is temporarily unavailable.",
+        ) from exc
+
+
+def _enforce_registration_code_limit(
+    raw_code: str,
+) -> None:
+    try:
+        if not is_registration_code_allowed(
+            f"registration-code:{hash_token(raw_code)}"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many registration attempts. Please try again later.",
+            )
+    except RateLimitUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration is temporarily unavailable.",
+        ) from exc
+
+
+def _enforce_registration_identity_limit(
+    request: Request,
+    email: str,
+) -> None:
+    try:
+        if not is_registration_identity_allowed(
+            f"registration-email:{hash_token(email.strip().lower())}"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many verification requests. Please try again later.",
+            )
+    except RateLimitUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Verification is temporarily unavailable.",
+        ) from exc
+
+
+def _ensure_email_available(email_service: EmailService) -> None:
+    try:
+        email_service.ensure_available()
+    except EmailDeliveryUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email delivery is not configured for this environment.",
+        ) from exc
+
+
+def _send_registration_verification_email(
+    email_service: EmailService,
+    user: User,
+    raw_token: str,
+) -> None:
+    try:
+        send_employee_verification_email(
+            email_service,
+            user,
+            raw_token,
+        )
+    except EmailDeliveryUnavailable as exc:
+        logger.error(
+            "Employee registration verification email delivery failed (%s)",
+            type(exc).__name__,
+        )
+
+
+@router.post(
+    "/auth/registration-code/validate",
+    response_model=RegistrationCodeValidationResponse,
+)
+async def validate_registration_code(
+    payload: RegistrationCodeValidate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    _enforce_registration_ip_limit(request)
+    _enforce_registration_code_limit(payload.code)
+    return {"valid": registration_code_is_valid(db, payload.code)}
+
+
+@router.post(
+    "/auth/register",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=RegistrationStatusResponse,
+)
+async def register_employee(
+    payload: EmployeeRegistrationCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service),
+):
+    _ensure_email_available(email_service)
+    _enforce_registration_ip_limit(request)
+    _enforce_registration_code_limit(payload.organization_code)
+
+    try:
+        registration = create_employee_registration(
+            db,
+            organization_code=payload.organization_code,
+            email=str(payload.email),
+            password=payload.password,
+            full_name=payload.full_name,
+            employee_id=payload.employee_id,
+            branch_id=payload.branch_id,
+            department_id=payload.department_id,
+            job_title=payload.job_title,
+        )
+    except LifecycleTransitionError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    if registration is not None:
+        user, raw_token = registration
+        _send_registration_verification_email(
+            email_service,
+            user,
+            raw_token,
+        )
+
+    return {"message": REGISTRATION_RESPONSE_MESSAGE}
+
+
+@router.post(
+    "/auth/resend-verification",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=RegistrationStatusResponse,
+)
+async def resend_employee_verification(
+    payload: ResendVerificationRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service),
+):
+    _ensure_email_available(email_service)
+    _enforce_registration_ip_limit(request)
+    _enforce_registration_identity_limit(request, str(payload.email))
+    registration = resend_registration_verification(
+        db,
+        str(payload.email),
+    )
+    if registration is not None:
+        user, raw_token = registration
+        _send_registration_verification_email(
+            email_service,
+            user,
+            raw_token,
+        )
+
+    return {"message": REGISTRATION_RESPONSE_MESSAGE}
+
+
+@router.post("/auth/verify-email")
+async def verify_employee_email(
+    payload: EmailVerificationRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        user = verify_registration_email(db, payload.token)
+    except LifecycleTransitionError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired email verification token.",
+        ) from exc
+    return {
+        "message": "Email verified. Your registration is awaiting approval.",
+        "approval_status": user.approval_status,
+    }
 
 
 @router.post("/auth/login")
@@ -122,6 +342,7 @@ async def forgot_password(
     db: Session = Depends(get_db),
     email_service: EmailService = Depends(get_email_service),
 ):
+    _ensure_email_available(email_service)
     recovery_ip_key = (
         f"password-recovery-ip:{request.client.host}"
     )
@@ -149,12 +370,19 @@ async def forgot_password(
     )
 
     if db_user is not None and db_user.is_active:
-        send_password_reset_email(
-            db,
-            db_user,
-            email_service,
-        )
-        db.commit()
+        try:
+            send_password_reset_email(
+                db,
+                db_user,
+                email_service,
+            )
+            db.commit()
+        except EmailDeliveryUnavailable as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Password recovery email could not be sent.",
+            ) from exc
 
     return {
         "message": (

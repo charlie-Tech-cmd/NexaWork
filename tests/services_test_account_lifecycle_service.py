@@ -309,7 +309,9 @@ def test_database_rejects_active_lifecycle_user_without_verification(
     db_session.rollback()
 
 
-def test_changing_managed_user_email_requires_reverification(db_session):
+def test_managed_user_email_cannot_change_without_reverification_flow(
+    db_session,
+):
     organization = create_organization(db_session, "email-change-org")
     actor = User(
         organization_id=organization.id,
@@ -331,17 +333,22 @@ def test_changing_managed_user_email_requires_reverification(db_session):
     db_session.commit()
     original_token_version = user.token_version
 
-    updated_user = update_user(
-        db=db_session,
-        user_id=user.id,
-        organization_id=organization.id,
-        actor_user_id=actor.id,
-        email="changed@example.com",
-        full_name=None,
-        is_active=None,
-    )
+    with pytest.raises(
+        LifecycleTransitionError,
+        match="Email cannot be changed",
+    ):
+        update_user(
+            db=db_session,
+            user_id=user.id,
+            organization_id=organization.id,
+            actor_user_id=actor.id,
+            email="changed@example.com",
+            full_name=None,
+            is_active=None,
+        )
 
-    assert updated_user.email == "changed@example.com"
-    assert updated_user.email_verified_at is None
-    assert updated_user.is_active is False
-    assert updated_user.token_version == original_token_version + 1
+    db_session.rollback()
+    assert user.email == "verified@example.com"
+    assert user.email_verified_at is not None
+    assert user.is_active is True
+    assert user.token_version == original_token_version
