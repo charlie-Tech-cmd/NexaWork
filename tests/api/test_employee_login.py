@@ -166,6 +166,30 @@ def test_employee_login_rejects_inactive_user(client, db_session):
     }
 
 
+def test_employee_login_rejects_pending_lifecycle_user(
+    client,
+    db_session,
+):
+    user, employee = create_employee_login_test_data(db_session)
+    user.lifecycle_managed = True
+    user.approval_status = "pending"
+    user.is_active = False
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/employee/login",
+        json={
+            "employee_id": employee.employee_id,
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid employee ID or password",
+    }
+
+
 def test_employee_login_token_accesses_employee_profile(
     client,
     db_session,

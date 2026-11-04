@@ -995,6 +995,7 @@ def test_deactivate_user_records_audit_event(db_session):
     )
     db_session.add_all([actor, target])
     db_session.commit()
+    original_token_version = target.token_version
 
     result = deactivate_user(
         db=db_session,
@@ -1006,6 +1007,7 @@ def test_deactivate_user_records_audit_event(db_session):
     )
 
     assert result.is_active is False
+    assert result.token_version == original_token_version + 1
 
     audit_log = db_session.scalar(
         select(AuditLog).where(
@@ -1051,6 +1053,7 @@ def test_deactivate_user_rolls_back_when_audit_write_fails(
     )
     db_session.add_all([actor, target])
     db_session.commit()
+    original_token_version = target.token_version
 
     with patch.object(
         db_session,
@@ -1079,6 +1082,7 @@ def test_deactivate_user_rolls_back_when_audit_write_fails(
     )
     assert persisted_user is not None
     assert persisted_user.is_active is True
+    assert persisted_user.token_version == original_token_version
 
     audit_log = db_session.scalar(
         select(AuditLog).where(

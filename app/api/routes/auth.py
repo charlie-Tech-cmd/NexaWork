@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
+from app.core.security.account_lifecycle import can_authenticate_user
 from app.core.security.password import hash_password, verify_password
 from app.core.security.jwt import create_access_token
 from app.core.rate_limit import (
@@ -81,7 +82,7 @@ async def login_user(
             detail="Invalid email or password",
         )
 
-    if not db_user.is_active:
+    if not can_authenticate_user(db_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive",
@@ -254,6 +255,11 @@ async def employee_login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid employee ID or password",
         )
+    if not can_authenticate_user(db_user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid employee ID or password",
+        )
 
     organization = db.scalar(
         select(Organization).where(
@@ -330,6 +336,11 @@ async def admin_login(
         admin_login.password,
         db_user.password_hash,
     ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+    if not can_authenticate_user(db_user):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -434,6 +445,11 @@ async def super_admin_login(
         super_admin_login.password,
         db_user.password_hash,
     ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+    if not can_authenticate_user(db_user):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",

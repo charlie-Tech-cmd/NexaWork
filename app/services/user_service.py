@@ -1,9 +1,11 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.security.account_lifecycle import can_activate_account
 from app.core.security.password import hash_password, verify_password
 from app.models.audit_log import AuditLog
 from app.models.user import User
+from app.services.account_lifecycle_service import LifecycleTransitionError
 
 
 def create_user(
@@ -72,6 +74,8 @@ def deactivate_user(
         raise ValueError("Invalid password")
 
     try:
+        if user.is_active:
+            user.token_version += 1
         user.is_active = False
         audit_log = AuditLog(
             organization_id=organization_id,
@@ -148,6 +152,16 @@ def update_user(
     if user is None:
         raise ValueError("User not found")
 
+    email_changed = email is not None and email != user.email
+    if is_active is True and user.lifecycle_managed and email_changed:
+        raise LifecycleTransitionError(
+            "Email changes require reverification before activation"
+        )
+    if is_active is True and not can_activate_account(user):
+        raise LifecycleTransitionError(
+            "Email verification and approval are required before activation"
+        )
+
     if email is not None:
         existing_user = db.scalar(
             select(User).where(
@@ -160,12 +174,17 @@ def update_user(
             raise ValueError("Email already registered")
 
         user.email = email
+        if email_changed and user.lifecycle_managed:
+            user.email_verified_at = None
+            user.is_active = False
+            user.token_version += 1
 
     if full_name is not None:
         user.full_name = full_name
 
-    if is_active is not None:
+    if is_active is not None and user.is_active != is_active:
         user.is_active = is_active
+        user.token_version += 1
 
     try:
         audit_log = AuditLog(

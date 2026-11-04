@@ -8,6 +8,7 @@ import jwt
 from app.core.rate_limit import RateLimitUnavailable, is_login_allowed
 from app.core.config import settings
 from app.core.security.password import hash_password, verify_password
+from app.core.security.jwt import create_access_token
 from app.core.security.reset_token import hash_reset_token
 from app.core.redis import redis_client
 
@@ -23,6 +24,7 @@ from app.models.branch import Branch
 from app.models.department import Department
 from app.models.employee import Employee
 from app.models.region import Region
+from app.services.user_service import update_user as update_user_service
 
 from unittest.mock import patch
 
@@ -64,6 +66,149 @@ def test_login_returns_access_token(client, db_session):
     assert data["email"] == user.email
     assert "access_token" in data
     assert data["access_token"]
+
+
+def test_pending_lifecycle_user_cannot_login_or_use_an_existing_token(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Pending Lifecycle Organization",
+        slug="pending-lifecycle-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="pending.lifecycle@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Pending Lifecycle User",
+        lifecycle_managed=True,
+        approval_status="pending",
+        is_active=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    token = create_access_token(
+        str(user.id),
+        token_version=user.token_version,
+    )
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+    profile_response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert login_response.status_code == 403
+    assert login_response.json() == {
+        "detail": "User account is inactive",
+    }
+    assert profile_response.status_code == 401
+    assert profile_response.json() == {
+        "detail": "User not found",
+    }
+
+
+def test_approved_and_verified_lifecycle_user_can_login(client, db_session):
+    organization = Organization(
+        name="Approved Lifecycle Organization",
+        slug="approved-lifecycle-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    user = User(
+        organization_id=organization.id,
+        email="approved.lifecycle@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Approved Lifecycle User",
+        lifecycle_managed=True,
+        email_verified_at=datetime.now(timezone.utc),
+        approval_status="approved",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": user.email,
+            "password": "SecurePassword123!",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == user.id
+
+
+def test_old_token_remains_revoked_after_user_is_reenabled(
+    client,
+    db_session,
+):
+    organization = Organization(
+        name="Token Lifecycle Organization",
+        slug="token-lifecycle-organization",
+    )
+    db_session.add(organization)
+    db_session.flush()
+
+    actor = User(
+        organization_id=organization.id,
+        email="token.lifecycle.admin@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Token Lifecycle Admin",
+    )
+    user = User(
+        organization_id=organization.id,
+        email="token.lifecycle.user@example.com",
+        password_hash=hash_password("SecurePassword123!"),
+        full_name="Token Lifecycle User",
+    )
+    db_session.add_all([actor, user])
+    db_session.commit()
+
+    token = create_access_token(
+        str(user.id),
+        token_version=user.token_version,
+    )
+    update_user_service(
+        db=db_session,
+        user_id=user.id,
+        organization_id=organization.id,
+        actor_user_id=actor.id,
+        email=None,
+        full_name=None,
+        is_active=False,
+    )
+    update_user_service(
+        db=db_session,
+        user_id=user.id,
+        organization_id=organization.id,
+        actor_user_id=actor.id,
+        email=None,
+        full_name=None,
+        is_active=True,
+    )
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Invalid or expired token",
+    }
+
 
 def test_auth_me_returns_authenticated_user(client, db_session):
     organization = Organization(

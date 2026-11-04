@@ -12,6 +12,7 @@ from app.services.user_service import (
     list_users as list_users_service,
     update_user as update_user_service,
 )
+from app.services.account_lifecycle_service import LifecycleTransitionError
 
 from app.schemas.user import (
     AdminUserCreate,
@@ -70,6 +71,12 @@ async def update_user(
             is_active=user_data.is_active,
         )
     except ValueError as exc:
+        if isinstance(exc, LifecycleTransitionError):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(exc),
+            ) from exc
+
         if str(exc) == "Email already registered":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

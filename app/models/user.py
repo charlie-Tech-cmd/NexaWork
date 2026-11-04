@@ -39,6 +39,37 @@ class User(Base):
             """,
             name="ck_users_super_admin_organization",
         ),
+        CheckConstraint(
+            """
+            approval_status IN ('pending', 'approved', 'rejected')
+            AND (
+                lifecycle_managed = TRUE
+                OR approval_status = 'approved'
+            )
+            """,
+            name="ck_users_approval_status",
+        ),
+        CheckConstraint(
+            """
+            lifecycle_managed = FALSE
+            OR (
+                is_super_admin = FALSE
+                AND organization_id IS NOT NULL
+            )
+            """,
+            name="ck_users_lifecycle_managed_tenant",
+        ),
+        CheckConstraint(
+            """
+            lifecycle_managed = FALSE
+            OR is_active = FALSE
+            OR (
+                approval_status = 'approved'
+                AND email_verified_at IS NOT NULL
+            )
+            """,
+            name="ck_users_lifecycle_active_eligible",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -66,6 +97,20 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
+        nullable=False,
+    )
+    lifecycle_managed: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    approval_status: Mapped[str] = mapped_column(
+        String(16),
+        default="approved",
         nullable=False,
     )
     is_super_admin: Mapped[bool] = mapped_column(
