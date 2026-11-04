@@ -33,7 +33,8 @@ button:disabled {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
@@ -171,7 +172,8 @@ p {
   font-weight: 600;
 }
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 45px;
   border: 1px solid var(--input-border);
@@ -180,6 +182,11 @@ select {
   padding: 10px 12px;
   color: var(--ink);
   font-size: 14px;
+}
+textarea {
+  min-height: 140px;
+  resize: vertical;
+  font: inherit;
 }
 input::placeholder {
   color: var(--muted);

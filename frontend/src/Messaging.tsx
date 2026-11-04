@@ -213,7 +213,7 @@ function ConversationFiles({
     </section>
   );
 }
-function ConversationThread({
+export function ConversationThread({
   api,
   conversation,
   session,
@@ -432,7 +432,10 @@ function ConversationThread({
     >
       <header className="thread-heading">
         <button className="secondary thread-back" onClick={back}>
-          ← Conversations
+          ←{" "}
+          {conversation.conversation_type === "channel"
+            ? "Channels"
+            : "Conversations"}
         </button>
         <div>
           <h2>{titleFor(conversation, session.id)}</h2>

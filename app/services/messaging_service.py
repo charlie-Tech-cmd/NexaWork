@@ -270,6 +270,7 @@ def list_conversations(
         )
         .where(
             Conversation.organization_id == organization_id,
+            Conversation.conversation_type != "channel",
             ConversationMember.user_id == user_id,
             ConversationMember.is_active.is_(True),
         )
@@ -506,6 +507,7 @@ def conversation_page(db, organization_id, user_id, limit=50, cursor=None):
         (ConversationMember.conversation_id == Conversation.id) &
         (ConversationMember.organization_id == Conversation.organization_id)).where(
         Conversation.organization_id == organization_id, ConversationMember.user_id == user_id,
+        Conversation.conversation_type != "channel",
         ConversationMember.is_active.is_(True))
     if cursor:
         try:

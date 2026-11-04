@@ -198,10 +198,11 @@ NexaWork is being developed incrementally.
 
 * Direct messaging
 * Group messaging
-* Channels
+* Public/private collaboration channels and channel messaging (initial slice implemented)
+* Organization-wide announcements (initial slice implemented)
 * WebSockets
 * Presence
-* Notifications
+* Channel notifications and search
 
 ### Phase 3 — Meetings
 
@@ -274,6 +275,8 @@ Completed foundation work includes:
 * Authenticated user profile endpoint
 
 The next major foundation work is focused on **organizations, multi-tenancy, employees, administrators, roles, and permissions**.
+
+An initial collaboration slice is also implemented: public/private channels reuse the existing message and configured attachment flows, and organization-wide announcements use an organization role permission. Channel search/notifications, real-time delivery, meetings, and the AI workplace assistant remain planned.
 
 ---
 

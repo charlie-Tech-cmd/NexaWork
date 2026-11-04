@@ -164,6 +164,8 @@ def onboard_organization(
         "ROLE_ASSIGN_PERMISSION",
         "ROLE_REMOVE_PERMISSION",
         "ADMIN_ACCESS",
+        "CHANNEL_CREATE",
+        "ANNOUNCEMENT_CREATE",
     ]
 
     permissions = db.scalars(

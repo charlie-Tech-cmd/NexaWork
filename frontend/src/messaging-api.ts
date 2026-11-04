@@ -3,8 +3,34 @@ export type Person = { id: number; full_name: string };
 export type Conversation = {
   id: number;
   name: string | null;
-  conversation_type: "direct" | "group";
+  conversation_type: "direct" | "group" | "channel";
+  channel_visibility?: "public" | "private" | null;
   members: Person[];
+};
+export type Channel = {
+  id: number;
+  name: string;
+  visibility: "public" | "private";
+  is_member: boolean;
+  membership_role: "member" | "moderator" | null;
+  member_count: number;
+  members: Person[];
+  created_by_user_id: number;
+  created_at: string;
+};
+export type ChannelMember = {
+  user_id: number;
+  full_name: string;
+  role: "member" | "moderator";
+  joined_at: string;
+};
+export type Announcement = {
+  id: number;
+  title: string;
+  body: string;
+  created_by_user_id: number;
+  author_name: string;
+  created_at: string;
 };
 export type Attachment = {
   id: number;
@@ -99,24 +125,26 @@ export function checkFiles(files: File[], policy: FilePolicy): void {
   }
 }
 export function createMessagingApi(token: string, expired: () => void) {
-  async function json<T>(
+  async function requestJson<T>(
     path: string,
     method = "GET",
     body?: unknown,
     signal?: AbortSignal,
   ): Promise<T> {
     try {
-      return (await request(
-        `/messaging${path}`,
-        token,
-        method,
-        body,
-        signal,
-      )) as T;
+      return (await request(path, token, method, body, signal)) as T;
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) expired();
       throw cause;
     }
+  }
+  function json<T>(
+    path: string,
+    method = "GET",
+    body?: unknown,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return requestJson(`/messaging${path}`, method, body, signal);
   }
   async function binary(
     path: string,
@@ -172,6 +200,55 @@ export function createMessagingApi(token: string, expired: () => void) {
       json<Conversation>("/direct", "POST", { recipient_user_id: id }),
     group: (name: string, ids: number[]) =>
       json<Conversation>("/groups", "POST", { name, member_user_ids: ids }),
+    channels: async (signal?: AbortSignal) =>
+      requestJson<{ items: Channel[]; can_create: boolean }>(
+        "/channels",
+        "GET",
+        undefined,
+        signal,
+      ),
+    createChannel: (name: string, visibility: Channel["visibility"]) =>
+      requestJson<
+        Channel & { organization_id: number; conversation_type: "channel" }
+      >("/channels", "POST", { name, visibility }),
+    joinChannel: (id: number) =>
+      requestJson<
+        Channel & { organization_id: number; conversation_type: "channel" }
+      >(`/channels/${id}/join`, "POST"),
+    channelMembers: (id: number, signal?: AbortSignal) =>
+      requestJson<ChannelMember[]>(
+        `/channels/${id}/members`,
+        "GET",
+        undefined,
+        signal,
+      ),
+    addChannelMember: (id: number, userId: number) =>
+      requestJson<ChannelMember>(`/channels/${id}/members`, "POST", {
+        user_id: userId,
+      }),
+    setChannelMemberRole: (
+      id: number,
+      userId: number,
+      role: ChannelMember["role"],
+    ) =>
+      requestJson<ChannelMember>(`/channels/${id}/members/${userId}`, "PATCH", {
+        role,
+      }),
+    removeChannelMember: (id: number, userId: number) =>
+      requestJson<null>(`/channels/${id}/members/${userId}`, "DELETE"),
+    announcements: async (before: number | null, signal?: AbortSignal) =>
+      requestJson<{
+        items: Announcement[];
+        can_publish: boolean;
+        next_cursor: number | null;
+      }>(
+        `/announcements?limit=50${before ? `&before_id=${before}` : ""}`,
+        "GET",
+        undefined,
+        signal,
+      ),
+    createAnnouncement: (title: string, body: string) =>
+      requestJson<Announcement>("/announcements", "POST", { title, body }),
     messages: (cid: number, before: number | null, signal?: AbortSignal) =>
       json<Page<Message>>(
         `/conversations/${cid}/messages?limit=50${before ? `&before_id=${before}` : ""}`,

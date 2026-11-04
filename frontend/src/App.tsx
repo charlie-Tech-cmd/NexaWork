@@ -28,9 +28,19 @@ import { useResource } from "./useResource";
 const Messaging = lazy(() =>
   import("./Messaging").then((module) => ({ default: module.Messaging })),
 );
+const Channels = lazy(() =>
+  import("./Channels").then((module) => ({ default: module.Channels })),
+);
+const Announcements = lazy(() =>
+  import("./Announcements").then((module) => ({
+    default: module.Announcements,
+  })),
+);
 const navigation: { id: string; label: string; icon: IconName }[] = [
   { id: "overview", label: "Overview", icon: "overview" },
   { id: "messages", label: "Messages", icon: "message" },
+  { id: "channels", label: "Channels", icon: "people" },
+  { id: "announcements", label: "Announcements", icon: "overview" },
   { id: "people", label: "People", icon: "people" },
   { id: "structure", label: "Organization", icon: "structure" },
   { id: "roles", label: "Roles & access", icon: "shield" },
@@ -471,6 +481,22 @@ function Workspace({
                       initialView={page === "files" ? "files" : "messages"}
                       policy={filePolicy}
                     />
+                  </Suspense>
+                )}
+                {page === "channels" && (
+                  <Suspense fallback={<p role="status">Opening channels…</p>}>
+                    <Channels
+                      session={session}
+                      signOut={signOut}
+                      policy={filePolicy}
+                    />
+                  </Suspense>
+                )}
+                {page === "announcements" && (
+                  <Suspense
+                    fallback={<p role="status">Opening announcements…</p>}
+                  >
+                    <Announcements session={session} signOut={signOut} />
                   </Suspense>
                 )}
                 {page === "people" && <Directory call={call} />}{" "}
