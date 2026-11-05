@@ -183,11 +183,25 @@ export function ConversationComposer({
                 className="text-button"
                 disabled={!!busy}
                 aria-label={`Remove ${file.name}`}
-                onClick={() => {
+                onClick={async () => {
                   const attachment = ready.get(file);
-                  if (attachment)
-                    void api.remove(cid, attachment.id).catch(() => {}); // TTL cleanup remains authoritative if offline.
-                  setFiles(files.filter((f) => f !== file));
+                  setError("");
+                  if (attachment) setBusy(`Removing ${file.name}…`);
+                  try {
+                    if (attachment) await api.remove(cid, attachment.id);
+                    setFiles((current) => current.filter((f) => f !== file));
+                    if (attachment) {
+                      setReady((current) => {
+                        const next = new Map(current);
+                        next.delete(file);
+                        return next;
+                      });
+                    }
+                  } catch (cause) {
+                    setError(errorMessage(cause));
+                  } finally {
+                    if (attachment) setBusy("");
+                  }
                 }}
               >
                 Remove
