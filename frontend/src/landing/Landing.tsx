@@ -35,7 +35,7 @@ function ConferencePhoto() {
       height="810"
       fetchPriority="high"
       decoding="async"
-      alt="Illustration of six colleagues with varied skin tones exchanging ideas around a conference table in a bright office."
+      alt="Women and men colleagues with varied skin tones sharing ideas around a conference table."
       onError={() => setFailed(true)}
     />
   );
@@ -132,7 +132,7 @@ function Hero() {
         <ConferencePhoto />
         <figcaption>
           <span>Built around people. Designed for connection.</span>
-          <span>Illustrative scene</span>
+          <span>Women and men working together</span>
         </figcaption>
       </figure>
       <div className="hero-footnote">
