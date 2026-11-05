@@ -12,7 +12,7 @@ The backend lifecycle and first frontend pass are now implemented:
 - Administrative lifecycle changes are written to the existing immutable audit log. Disable actions invalidate existing JWTs.
 - Public onboarding endpoints use the existing Redis-backed IP rate limiter.
 
-The configured email service is still the repository's fake development implementation. Configure a real email provider before relying on delivery in production. Verification and invitation links use the host from `PASSWORD_RESET_URL`.
+Local development defaults to the fake email service. Real delivery is available through the configurable SMTP email service; set `EMAIL_PROVIDER=smtp`, `SMTP_HOST`, and `SMTP_FROM_EMAIL`, then provide SMTP credentials through the deployment secret manager when required. SMTP authentication requires TLS. Production rejects the fake provider and requires TLS. Invitation, verification, approval and recovery messages use the host from `PASSWORD_RESET_URL`. Delivery failures are surfaced to the request caller; because onboarding state is committed before the email is sent, failed invitation sends can be retried from Onboarding.
 
 ## 1. Existing capabilities that can be reused
 

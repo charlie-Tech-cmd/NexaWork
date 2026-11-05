@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ApiError, errorMessage, record, records, request } from "./api";
-import type { Call } from "./Directory";
+import {
+  ApiError,
+  errorMessage,
+  record,
+  records,
+  request,
+  type RecordData,
+} from "./api";
+import { InvitationLink, type Call } from "./Directory";
 import { Icon } from "./Icon";
 import { DataForm, Empty, ErrorState, PageHeading, type Field } from "./ui";
 import { useResource } from "./useResource";
@@ -171,12 +178,18 @@ export function PublicOnboarding({
     setBusy(true);
     setError("");
     try {
-      await request("/onboarding/invitations/accept", "", "POST", {
-        token,
-        password: acceptancePassword,
-      });
+      const response = record(
+        await request("/onboarding/invitations/accept", "", "POST", {
+          token,
+          password: acceptancePassword,
+        }),
+      );
+      if (typeof response.employee_id !== "string")
+        throw new ApiError("The server did not return your employee ID.");
       setComplete(true);
-      setNotice("Your account is ready. You can now sign in.");
+      setNotice(
+        `Your account is ready. Your Employee ID is ${response.employee_id}. Sign in using Employee ID and the password you chose.`,
+      );
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -430,6 +443,7 @@ export function OnboardingAdmin({ call }: { call: Call }) {
     [call],
   );
   const [showInviteForm, setShowInviteForm] = useState(false);
+  const [lastInvitation, setLastInvitation] = useState<RecordData | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [newCode, setNewCode] = useState("");
@@ -543,26 +557,35 @@ export function OnboardingAdmin({ call }: { call: Call }) {
         <section className="panel editor">
           <h2>Invite an employee</h2>
           <p className="muted">
-            The invitation will be sent to their email address. Use the branch
-            and department IDs from Organization.
+            Create an invitation for an employee to choose their own password.
+            Email delivery is simulated in this development setup; you can
+            securely share the acceptance link.
           </p>
           <DataForm
             fields={inviteFields}
             submit="Send invitation"
             onCancel={() => setShowInviteForm(false)}
             onSave={async (data) => {
-              await call("/onboarding/invitations", "POST", {
-                ...data,
-                branch_id: Number(data.branch_id),
-                department_id: Number(data.department_id),
-              });
+              const invitation = record(
+                await call("/onboarding/invitations", "POST", {
+                  ...data,
+                  branch_id: Number(data.branch_id),
+                  department_id: Number(data.department_id),
+                }),
+              );
+              if (typeof invitation.acceptance_url !== "string")
+                throw new Error(
+                  "The server did not return an invitation link.",
+                );
+              setLastInvitation(invitation);
               setShowInviteForm(false);
-              setNotice("Invitation created and sent.");
+              setNotice("Invitation created.");
               invitations.reload();
             }}
           />
         </section>
       )}
+      {lastInvitation && <InvitationLink invitation={lastInvitation} />}
 
       <section className="panel">
         <div className="panel-toolbar">
@@ -686,6 +709,8 @@ export function OnboardingAdmin({ call }: { call: Call }) {
                 <div>
                   <strong>{String(item.full_name)}</strong>
                   <p className="muted">
+                    {typeof item.employee_id === "string" &&
+                      `Employee ID ${item.employee_id} · `}
                     {String(item.email)} · {String(item.job_title)} · email{" "}
                     {String(item.email_verification_status)} · request{" "}
                     {String(item.approval_status)}
@@ -797,14 +822,20 @@ export function OnboardingAdmin({ call }: { call: Call }) {
                     <button
                       className="secondary"
                       onClick={() =>
-                        perform(
-                          () =>
-                            call(
+                        perform(async () => {
+                          const result = record(
+                            await call(
                               `/onboarding/invitations/${invitation.id}/resend`,
                               "POST",
                             ),
-                          "Invitation resent.",
-                        )
+                          );
+                          if (typeof result.acceptance_url !== "string")
+                            throw new Error(
+                              "The server did not return an invitation link.",
+                            );
+                          setLastInvitation(result);
+                          return result;
+                        }, "Invitation renewed.")
                       }
                     >
                       Resend
@@ -886,6 +917,7 @@ export function OnboardingAdmin({ call }: { call: Call }) {
                 <div>
                   <strong>{String(employee.full_name)}</strong>
                   <p className="muted">
+                    Employee ID {String(employee.employee_id)} ·{" "}
                     {String(employee.email)} · {String(employee.job_title)} ·{" "}
                     {String(employee.account_status)}
                   </p>

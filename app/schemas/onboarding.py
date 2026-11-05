@@ -70,6 +70,7 @@ class EmployeeRegistrationRequestResponse(BaseModel):
     organization_id: int
     email: EmailStr
     full_name: str
+    employee_id: str | None = None
     branch_id: int
     department_id: int
     job_title: str
@@ -108,6 +109,14 @@ class EmployeeInvitationResponse(BaseModel):
     created_at: datetime
 
 
+class EmployeeInvitationAcceptanceResponse(EmployeeInvitationResponse):
+    employee_id: str
+
+
+class EmployeeInvitationLinkResponse(EmployeeInvitationResponse):
+    acceptance_url: str
+
+
 class InvitationAcceptanceRequest(BaseModel):
     token: str
     password: str = Field(min_length=8, max_length=255)
@@ -124,6 +133,7 @@ class AccountStatusUpdate(BaseModel):
 class EmployeeAccountResponse(BaseModel):
     id: int
     organization_id: int
+    employee_id: str
     email: EmailStr
     full_name: str
     branch_id: int

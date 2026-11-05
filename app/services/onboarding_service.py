@@ -444,12 +444,43 @@ def resend_registration_verification(
     return request
 
 
-def list_registration_requests(db: Session, organization_id: int) -> list[EmployeeRegistrationRequest]:
-    return db.scalars(
-        select(EmployeeRegistrationRequest)
+def list_registration_requests(
+    db: Session,
+    organization_id: int,
+) -> list[dict[str, object]]:
+    rows = db.execute(
+        select(EmployeeRegistrationRequest, Employee.employee_id)
+        .outerjoin(
+            User,
+            (User.organization_id == EmployeeRegistrationRequest.organization_id)
+            & (User.email == EmployeeRegistrationRequest.email),
+        )
+        .outerjoin(
+            Employee,
+            (Employee.user_id == User.id)
+            & (Employee.organization_id == EmployeeRegistrationRequest.organization_id),
+        )
         .where(EmployeeRegistrationRequest.organization_id == organization_id)
         .order_by(EmployeeRegistrationRequest.created_at.desc())
     ).all()
+    return [
+        {
+            "id": registration_request.id,
+            "organization_id": registration_request.organization_id,
+            "email": registration_request.email,
+            "full_name": registration_request.full_name,
+            "branch_id": registration_request.branch_id,
+            "department_id": registration_request.department_id,
+            "job_title": registration_request.job_title,
+            "email_verification_status": registration_request.email_verification_status,
+            "approval_status": registration_request.approval_status,
+            "account_status": registration_request.account_status,
+            "approval_reason": registration_request.approval_reason,
+            "created_at": registration_request.created_at,
+            "employee_id": employee_id,
+        }
+        for registration_request, employee_id in rows
+    ]
 
 
 def approve_registration_request(
@@ -678,6 +709,7 @@ def list_employee_accounts(
         {
             "id": employee.id,
             "organization_id": employee.organization_id,
+            "employee_id": employee.employee_id,
             "email": user.email,
             "full_name": user.full_name,
             "branch_id": employee.branch_id,
@@ -762,7 +794,7 @@ def accept_invitation(
     *,
     token: str,
     password: str,
-) -> EmployeeInvitation:
+) -> tuple[EmployeeInvitation, str]:
     invitation = db.scalar(
         select(EmployeeInvitation).where(
             EmployeeInvitation.invitation_token == token,
@@ -812,9 +844,10 @@ def accept_invitation(
     invitation.status = "accepted"
     invitation.invitation_token = _new_token()
     invitation.accepted_at = datetime.now(timezone.utc)
+    employee_id = employee.employee_id
     db.commit()
     db.refresh(invitation)
-    return invitation
+    return invitation, employee_id
 
 
 def disable_employee_account(

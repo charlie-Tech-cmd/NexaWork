@@ -166,6 +166,12 @@ export function Auth({
               ))}
             </div>
           )}
+          {view === "login" && mode === "employee" && (
+            <p className="muted">
+              Use the Employee ID from your approval email or invitation
+              confirmation, with the password you created.
+            </p>
+          )}
           {notice && (
             <p className="notice" role="status">
               {notice}

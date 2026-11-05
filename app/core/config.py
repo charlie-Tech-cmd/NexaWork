@@ -13,6 +13,16 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
     redis_url: str = "redis://localhost:6379/0"
+    email_provider: Literal["fake", "smtp"] = "fake"
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_from_name: str = "NexaWork"
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+    smtp_timeout_seconds: int = Field(default=15, ge=1, le=120)
 
     rate_limit_max_attempts: int = Field(default=5, gt=0)
     rate_limit_window_seconds: int = Field(default=60, gt=0)
@@ -82,6 +92,23 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self):
+        if self.smtp_use_tls and self.smtp_use_ssl:
+            raise ValueError("SMTP_USE_TLS and SMTP_USE_SSL cannot both be enabled")
+        if bool(self.smtp_username.strip()) != bool(self.smtp_password):
+            raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be configured together")
+        if self.smtp_username.strip() and not (
+            self.smtp_use_tls or self.smtp_use_ssl
+        ):
+            raise ValueError("SMTP authentication requires TLS")
+        if self.email_provider == "smtp":
+            smtp_errors = []
+            if not self.smtp_host.strip():
+                smtp_errors.append("SMTP_HOST is required for SMTP email")
+            if not self.smtp_from_email.strip():
+                smtp_errors.append("SMTP_FROM_EMAIL is required for SMTP email")
+            if smtp_errors:
+                raise ValueError("; ".join(smtp_errors))
+
         if self.allow_unscanned_development_files and self.environment.strip().lower() not in {
             "development",
             "test",
@@ -91,6 +118,10 @@ class Settings(BaseSettings):
             return self
 
         errors = []
+        if self.email_provider != "smtp":
+            errors.append("EMAIL_PROVIDER must be smtp in production")
+        if not (self.smtp_use_tls or self.smtp_use_ssl):
+            errors.append("SMTP email must use TLS in production")
         if self.allow_unscanned_development_files:
             errors.append("Unscanned file bypass is forbidden in production")
         if self.attachments_enabled and (

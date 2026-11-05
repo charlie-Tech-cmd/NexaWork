@@ -15,6 +15,7 @@ from app.models.role import Role
 from app.models.role_permission import role_permissions
 from app.models.user import User
 from app.models.user_role import user_roles
+from app.schemas.onboarding import EmployeeInvitationResponse
 
 
 def _create_admin(
@@ -204,6 +205,9 @@ def test_registration_code_and_self_registration_flow(
     assert approval_response.status_code == 200
     approved = approval_response.json()
     assert approved["approval_status"] == "approved"
+    assert approved["employee_id"]
+    assert approved["employee_id"] in email_service.sent_emails[-1]["body"]
+    assert "password you chose" in email_service.sent_emails[-1]["body"]
 
     user = db_session.scalar(
         select(User).where(User.email == "jane.employee@example.com")
@@ -214,6 +218,31 @@ def test_registration_code_and_self_registration_flow(
     )
     assert employee is not None
     assert employee.approval_status == "approved"
+    assert employee.employee_id == approved["employee_id"]
+
+    listed_requests = client.get(
+        "/api/v1/onboarding/requests",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert listed_requests.status_code == 200
+    assert listed_requests.json()[0]["employee_id"] == employee.employee_id
+
+    listed_employees = client.get(
+        "/api/v1/onboarding/employees",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert listed_employees.status_code == 200
+    assert listed_employees.json()[0]["employee_id"] == employee.employee_id
+
+    employee_login = client.post(
+        "/api/v1/auth/employee/login",
+        json={
+            "employee_id": employee.employee_id,
+            "password": "SecurePassword123!",
+        },
+    )
+    assert employee_login.status_code == 200
+    assert employee_login.json()["employee_id"] == employee.employee_id
     assert db_session.scalar(
         select(AuditLog.id).where(
             AuditLog.action == "onboarding.registration_code.created"
@@ -329,17 +358,31 @@ def test_invitation_acceptance_creates_employee_and_consumes_link(
     )
     assert response.status_code == 201
     invitation_link = email_service.sent_emails[-1]["body"].rsplit(" ", 1)[-1]
+    assert response.json()["acceptance_url"] == invitation_link
     invitation_token = parse_qs(urlsplit(invitation_link).query)["token"][0]
+
+    assert "acceptance_url" not in EmployeeInvitationResponse.model_fields
+    resent = client.post(
+        f"/api/v1/onboarding/invitations/{response.json()['id']}/resend",
+        headers={"Authorization": "Bearer " + token},
+    )
+    assert resent.status_code == 200
+    resent_link = resent.json()["acceptance_url"]
+    assert resent_link != invitation_link
+    assert email_service.sent_emails[-1]["body"].endswith(resent_link)
+    resent_token = parse_qs(urlsplit(resent_link).query)["token"][0]
 
     accepted = client.post(
         "/api/v1/onboarding/invitations/accept",
         json={
-            "token": invitation_token,
+            "token": resent_token,
             "password": "SecurePassword123!",
         },
     )
     assert accepted.status_code == 200
     assert accepted.json()["status"] == "accepted"
+    assert accepted.json()["employee_id"]
+    assert "employee_id" not in EmployeeInvitationResponse.model_fields
     assert "invitation_token" not in accepted.json()
     assert db_session.scalar(
         select(User).where(User.email == "invited@example.com")
@@ -348,11 +391,19 @@ def test_invitation_acceptance_creates_employee_and_consumes_link(
     replayed = client.post(
         "/api/v1/onboarding/invitations/accept",
         json={
-            "token": invitation_token,
+            "token": resent_token,
             "password": "SecurePassword123!",
         },
     )
     assert replayed.status_code == 400
+    expired_link = client.post(
+        "/api/v1/onboarding/invitations/accept",
+        json={
+            "token": invitation_token,
+            "password": "SecurePassword123!",
+        },
+    )
+    assert expired_link.status_code == 400
 
 
 def test_employee_disable_and_enable_flow(client, db_session):

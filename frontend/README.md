@@ -19,13 +19,13 @@ Sign in as a member, organization administrator, or with an employee ID. New org
 ## Implemented workflows
 
 - Organization onboarding; member, administrator and employee-ID sign-in.
-- Password recovery request and reset-token entry. The current backend uses a fake email provider; real recovery delivery requires backend work.
+- Password recovery request and reset-token entry. Real delivery can be enabled by configuring the backend SMTP provider; local development defaults to simulated email.
 - Workspace overview showing the actual organization and signed-in identity.
-- Active people directory, 20 records per page, search within the current page, account creation and name/email edits. No invented totals or server-wide search.
+- Active people directory, 20 records per page, search within the current page, invitation creation and name/email edits. Invitees choose their password when accepting their one-time, expiring link. Local email delivery is simulated, so administrators can copy and share the acceptance link securely. No invented totals or server-wide search.
 - Regions → branches → departments → teams, with parent-scoped listing and creation. Team creation includes the backend-required `department_id`.
 - Role listing, creation and inspection of assigned permissions.
 - Organization name/handle updates.
-- Direct/group conversations, paged history, per-member seen status, replies that link back to and highlight the original message, private file attachments and a conversation-scoped Files view. Seen status updates while the conversation is open; delivery remains poll-based, not real-time. The Files navigation and conversation tab follow the authenticated backend policy; the upload picker also requires scanner configuration and a private writable storage directory. See [setup and release gates](../docs/MESSAGING_FILES_SETUP.md).
+- Direct/group conversations, paged history, per-member seen status, replies that link back to and highlight the original message, private file attachments and a conversation-scoped Files view. Seen status updates while the conversation is open; delivery remains poll-based, not real-time. The Files navigation and conversation tab follow the authenticated backend policy. The development `.env.example` enables uploads to private local storage using the explicitly unscanned development-only mode; use synthetic files only. Production uploads still require persistent private storage, ClamAV and rate limits. See [setup and release gates](../docs/MESSAGING_FILES_SETUP.md).
 - Public and private collaboration channels with public joining, moderator-managed private invitations and membership, channel messages/replies, and the existing file-sharing policy.
 - Organization-wide company announcements. Active organization members can read the feed; publishing is controlled by the `ANNOUNCEMENT_CREATE` organization role permission.
 - Loading, empty, validation, permission-denied, network failure, retry and session-expiry states.
@@ -37,6 +37,8 @@ Channel search, channel notifications and real-time delivery are not included ye
 Authorization remains enforced by FastAPI. Channel creation and announcement publishing follow backend-reported capabilities and server-side role permissions; channel membership and message access are checked by the API. Administrator sign-in uses its separate endpoint. UI mode does not grant access.
 
 Bearer tokens exist only in React memory, never localStorage, sessionStorage, URLs or logs. Requests omit cookies, reject redirects and time out after 20 seconds. Navigating away cancels list requests. Changed resource identifiers hide old records before new results arrive. Mutations are not automatically retried. There are no remote fonts, analytics or third-party assets. Text is escaped by React.
+
+The session-token statement above concerns authenticated API access. Invitation tokens are single-use, expiring acceptance links returned to the authorized inviter so they can be shared securely while local email delivery is simulated.
 
 The 12-character minimum on new passwords is a frontend UX rule, not a replacement for missing backend password validation. Known backend audit findings remain release blockers; this change does not alter authentication or authorization rules.
 

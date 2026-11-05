@@ -336,6 +336,11 @@ input::placeholder {
   flex-wrap: wrap;
   margin-top: 3px;
 }
+.invitation-open-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
 .status {
   display: inline-flex;
   align-items: center;

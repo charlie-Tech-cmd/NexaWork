@@ -509,7 +509,13 @@ function Workspace({
                     <Announcements session={session} signOut={signOut} />
                   </Suspense>
                 )}
-                {page === "people" && <Directory call={call} />}{" "}
+                {page === "people" && (
+                  <Directory
+                    call={call}
+                    organizationId={organization.data.id}
+                    canInvite={session.mode === "admin"}
+                  />
+                )}{" "}
                 {page === "structure" && (
                   <Structure call={call} organization={organization.data} />
                 )}{" "}

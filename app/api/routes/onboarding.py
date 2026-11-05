@@ -13,13 +13,16 @@ from app.api.dependencies_email import get_email_service
 from app.core.config import settings
 from app.core.rate_limit import is_organization_onboarding_ip_allowed
 from app.db.session import get_db
+from app.models.employee import Employee
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.onboarding import (
     AccountStatusUpdate,
     EmailVerificationRequest,
     EmployeeApprovalAction,
+    EmployeeInvitationAcceptanceResponse,
     EmployeeInvitationCreate,
+    EmployeeInvitationLinkResponse,
     EmployeeInvitationResponse,
     EmployeeRegistrationRequestCreate,
     EmployeeRegistrationRequestResponse,
@@ -328,12 +331,29 @@ def approve_request(
             detail="The employee account could not be created because it conflicts with an existing record.",
         ) from exc
 
+    employee = db.scalar(
+        select(Employee)
+        .join(User, User.id == Employee.user_id)
+        .where(
+            Employee.organization_id == current_organization.id,
+            User.email == request.email,
+        )
+    )
+    if employee is None:
+        raise RuntimeError("Approved employee account could not be found")
+
     email_service.send(
         recipient=request.email,
         subject="Your NexaWork registration has been approved",
-        body="Your registration was approved and your employee account is ready to use.",
+        body=(
+            "Your registration was approved and your employee account is ready to use. "
+            f"Your Employee ID is {employee.employee_id}. "
+            "Sign in using Employee ID and the password you chose during registration."
+        ),
     )
-    return request
+    return EmployeeRegistrationRequestResponse.model_validate(request).model_dump() | {
+        "employee_id": employee.employee_id,
+    }
 
 
 @router.post(
@@ -372,7 +392,7 @@ def reject_request(
 
 @router.post(
     "/invitations",
-    response_model=EmployeeInvitationResponse,
+    response_model=EmployeeInvitationLinkResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def create_invitation(
@@ -403,15 +423,22 @@ def create_invitation(
             detail="An invitation or account already exists for this email.",
         ) from exc
 
+    acceptance_url = _onboarding_link(
+        "/accept-invitation",
+        invitation.invitation_token,
+    )
     email_service.send(
         recipient=invitation.email,
         subject="Your NexaWork employee invitation",
         body=(
             "You have been invited to join NexaWork. Accept your invitation here: "
-            f"{_onboarding_link('/accept-invitation', invitation.invitation_token)}"
+            f"{acceptance_url}"
         ),
     )
-    return invitation
+    return EmployeeInvitationLinkResponse(
+        **EmployeeInvitationResponse.model_validate(invitation).model_dump(),
+        acceptance_url=acceptance_url,
+    )
 
 
 @router.get("/invitations", response_model=list[EmployeeInvitationResponse])
@@ -435,7 +462,10 @@ def list_employees(
     return list_employee_accounts(db, current_organization.id)
 
 
-@router.post("/invitations/{invitation_id}/resend", response_model=EmployeeInvitationResponse)
+@router.post(
+    "/invitations/{invitation_id}/resend",
+    response_model=EmployeeInvitationLinkResponse,
+)
 def resend_invitation_route(
     invitation_id: int,
     current_admin: User = Depends(require_admin_access),
@@ -453,15 +483,22 @@ def resend_invitation_route(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    acceptance_url = _onboarding_link(
+        "/accept-invitation",
+        invitation.invitation_token,
+    )
     email_service.send(
         recipient=invitation.email,
         subject="Your NexaWork invitation has been resent",
         body=(
             "Your invitation has been resent. Accept it here: "
-            f"{_onboarding_link('/accept-invitation', invitation.invitation_token)}"
+            f"{acceptance_url}"
         ),
     )
-    return invitation
+    return EmployeeInvitationLinkResponse(
+        **EmployeeInvitationResponse.model_validate(invitation).model_dump(),
+        acceptance_url=acceptance_url,
+    )
 
 
 @router.post("/invitations/{invitation_id}/revoke", response_model=EmployeeInvitationResponse)
@@ -482,7 +519,10 @@ def revoke_invitation_route(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/invitations/accept", response_model=EmployeeInvitationResponse)
+@router.post(
+    "/invitations/accept",
+    response_model=EmployeeInvitationAcceptanceResponse,
+)
 def accept_invitation_route(
     payload: InvitationAcceptanceRequest,
     http_request: Request,
@@ -490,7 +530,15 @@ def accept_invitation_route(
 ):
     _enforce_onboarding_rate_limit(http_request, "accept-invitation")
     try:
-        return accept_invitation(db, token=payload.token, password=payload.password)
+        invitation, employee_id = accept_invitation(
+            db,
+            token=payload.token,
+            password=payload.password,
+        )
+        return EmployeeInvitationAcceptanceResponse(
+            **EmployeeInvitationResponse.model_validate(invitation).model_dump(),
+            employee_id=employee_id,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except IntegrityError as exc:

@@ -1,7 +1,27 @@
+from pathlib import Path
+
 import pytest
+from dotenv import dotenv_values
 from pydantic import ValidationError
 
 from app.core.config import Settings
+
+
+def test_development_example_enables_local_file_sharing_only():
+    example = Path(__file__).resolve().parents[1] / ".env.example"
+    values = {
+        key.lower(): value
+        for key, value in dotenv_values(example).items()
+        if value is not None
+    }
+
+    settings = Settings(_env_file=None, **values)
+
+    assert settings.environment == "development"
+    assert settings.attachments_enabled
+    assert settings.allow_unscanned_development_files
+    assert settings.attachment_uploads_enabled
+    assert settings.email_provider == "fake"
 
 
 def make_production_settings(**overrides):
@@ -13,6 +33,9 @@ def make_production_settings(**overrides):
         "password_reset_url": "https://app.example.com/reset-password",
         "cors_origins": "https://app.example.com",
         "allowed_hosts": "app.example.com",
+        "email_provider": "smtp",
+        "smtp_host": "smtp.example.com",
+        "smtp_from_email": "noreply@example.com",
     }
     values.update(overrides)
 
@@ -24,6 +47,39 @@ def test_valid_production_settings_are_accepted():
 
     assert settings.environment == "production"
     assert settings.cors_origin_list == ["https://app.example.com"]
+
+
+def test_production_requires_configured_smtp_delivery():
+    with pytest.raises(ValidationError, match="EMAIL_PROVIDER"):
+        make_production_settings(email_provider="fake")
+
+    with pytest.raises(ValidationError, match="TLS"):
+        make_production_settings(smtp_use_tls=False)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"email_provider": "smtp"}, "SMTP_HOST"),
+        ({"smtp_username": "mailer"}, "SMTP_USERNAME"),
+        ({"smtp_use_tls": True, "smtp_use_ssl": True}, "cannot both"),
+        (
+            {
+                "smtp_username": "mailer",
+                "smtp_password": "test-password",
+                "smtp_use_tls": False,
+            },
+            "requires TLS",
+        ),
+    ],
+)
+def test_invalid_smtp_settings_are_rejected(overrides, message):
+    with pytest.raises(ValidationError, match=message):
+        Settings(
+            _env_file=None,
+            jwt_secret_key="test-secret-nexawork",
+            **overrides,
+        )
 
 
 def test_production_attachment_storage_root_must_be_absolute():
